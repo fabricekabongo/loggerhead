@@ -40,7 +40,6 @@ CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o loggerhead
 
 The output will look like so:
 ```txt
-go run . --cluster-dns=localhost
 2024/06/10 01:44:07 Please set the following environment variables:
 2024/06/10 01:44:07 CLUSTER_DNS
 2024/06/10 01:44:07 Reverting to flags...
@@ -48,17 +47,17 @@ go run . --cluster-dns=localhost
 2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=[::1]:42194
 2024/06/10 01:44:07 Sharing local state to a new node
 2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  127.0.0.1:20001
+2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  172.45.0.2:20001
 2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=127.0.0.1:48278
+2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=172.45.0.2:48278
 2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  127.0.0.1:20001
+2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  172.45.0.2:20001
 2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=127.0.0.1:48282
+2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=172.45.0.2:48282
 2024/06/10 01:44:07 Sharing local state to a new node
 ===========================================================
 Starting the Database Server
-Cluster DNS:  localhost
+Cluster DNS:  loggerhead.default.svc.cluster.local
 Use the following ports for the following services:
 Writing location update: 19999
 Reading location update: 19998

@@ -35,11 +35,14 @@ CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o loggerhead
 ## Running
 
 ```shell
+
 ./loggerhead --cluster-dns=loggerhead.default.svc.cluster.local
+
 ```
 
 The output will look like so:
-```txt
+
+```
 2024/06/10 01:44:07 Please set the following environment variables:
 2024/06/10 01:44:07 CLUSTER_DNS
 2024/06/10 01:44:07 Reverting to flags...

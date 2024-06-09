@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>GeoDB Admin</title>
+    <link rel="stylesheet" href="/static/static/bootstrap/css/bootstrap.css">
+</head>
+<body>
+    <h1>Welcome to Geo DB Admin interface</h1>
+    <p>There are currently {{.NodesAlive}} node(s) alive</p>
+    <div class="container">
+        <div class="row">
+            <h2>Cluster:</h2>
+            {{range $member := .Members}}
+            <div class="col-3 mt-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="card-title">
+                            {{$member.Name}}
+                        </div>
+                        <div class="card-text">
+                            <ul>
+                                <li>Address: {{$member.Addr}}</li>
+                                <li>Status: {{$member.State}}</li>
+                                <li>Stored Locations: {{$member.Meta.Locations}}</li>
+                                <li>Instantiated Grids: {{$member.Meta.Grids}}</li>
+                                <li>Memory:
+                                    <ul>
+                                        <li>Memory Usage (Alloc): {{$member.Meta.MemStats.Alloc}} Mb</li>
+                                        <li>Total Used Memory (TotalAlloc): {{$member.Meta.MemStats.Alloc}} Mb</li>
+                                        <li>Reserved Memory (Sys): {{$member.Meta.MemStats.Sys}} Mb</li>
+                                    </ul>
+                                </li>
+                                <li>Usable CPUs: {{$member.Meta.CPUs}}</li>
+                                <li>GoRoutine Running: {{$member.Meta.GoRoutines}}</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {{end}}
+        </div>
+    </div>
+    <script src="/static/static/bootstrap/js/bootstrap.js"></script>
+</body>
+</html>

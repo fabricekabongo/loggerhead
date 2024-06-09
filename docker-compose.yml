@@ -1,0 +1,8 @@
+services:
+    loggerhead:
+        build:
+            context: .
+        ports:
+            -   "19998:19998"
+        environment:
+        - CLUSTER_DNS=loggerhead

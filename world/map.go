@@ -1,21 +1,10 @@
 package world
 
 import (
-	"errors"
 	"github.com/uber/h3-go"
 	"log"
 	"sync"
 )
-
-var (
-	ErrLocIdRequired = errors.New("location id is required")
-)
-
-type LocationEntity struct {
-	LocId string  `json:"loc_id"`
-	Lat   float64 `json:"lat"`
-	Lon   float64 `json:"lon"`
-}
 
 type Stats struct {
 	Locations int
@@ -23,16 +12,16 @@ type Stats struct {
 }
 
 type Map struct {
-	Locations map[string]*LocationEntity `json:"locations"`
-	Grids     map[string]*Grid           `json:"grids"`
-	Mu        sync.RWMutex               // to protect the location
+	Locations map[string]*Location `json:"locations"`
+	Grids     map[string]*Grid     `json:"grids"`
+	Mu        sync.RWMutex         // to protect the location
 	Stat      Stats
 }
 
 func NewMap() *Map {
 
 	return &Map{
-		Locations: make(map[string]*LocationEntity),
+		Locations: make(map[string]*Location),
 		Grids:     make(map[string]*Grid),
 		Mu:        sync.RWMutex{},
 		Stat:      Stats{},
@@ -51,7 +40,7 @@ func (m *Map) Save(locId string, lat float64, lon float64) error {
 	defer m.Mu.Unlock()
 
 	if len(locId) == 0 {
-		return ErrLocIdRequired
+		return LocationErrorRequiredId
 	}
 
 	currLoc, ok := m.Locations[locId]
@@ -68,14 +57,14 @@ func (m *Map) Save(locId string, lat float64, lon float64) error {
 	return nil
 }
 
-func (m *Map) assignToGrid(lat float64, lon float64, currLoc *LocationEntity) {
-	currentGrid := m.getGrid(currLoc.Lat, currLoc.Lon)
-	newGrid := m.getGrid(lat, lon)
-
-	if currentGrid.Name != newGrid.Name {
-		currentGrid.DeleteLocation(currLoc)
-		newGrid.AddLocation(currLoc)
-	}
+func (m *Map) assignToGrid(lat float64, lon float64, currLoc *Location) {
+	//currentGrid := m.getGrid(currLoc.Lat, currLoc.Lon)
+	//newGrid := m.getGrid(lat, lon)
+	//
+	//if currentGrid.Name != newGrid.Name {
+	//	currentGrid.DeleteLocation(currLoc)
+	//	newGrid.SaveLocation(currLoc)
+	//}
 }
 
 func (m *Map) createLocation(locId string, lat float64, lon float64) {
@@ -88,10 +77,10 @@ func (m *Map) createLocation(locId string, lat float64, lon float64) {
 		log.Fatal("Location already exists. It should have never reached this point")
 	}
 
-	loc := &LocationEntity{
-		LocId: locId,
-		Lat:   lat,
-		Lon:   lon,
+	loc := &Location{
+		Id:  locId,
+		Lat: lat,
+		Lon: lon,
 	}
 
 	m.Locations[locId] = loc
@@ -110,10 +99,17 @@ func (m *Map) getGrid(lat float64, lon float64) *Grid {
 	geoHash := h3.FromGeo(geo, 4)
 	geoHashString := h3.ToString(geoHash)
 
+	if len(geoHashString) == 0 {
+		log.Fatal("geoHashString is empty")
+	}
+
 	grid, ok := m.Grids[geoHashString]
 
 	if !ok {
-		grid = NewGrid(geoHashString)
+		grid, err := NewGrid(geoHashString)
+		if err != nil {
+			log.Fatalf("Error creating grid: %v", err)
+		}
 		m.Grids[geoHashString] = grid
 		m.Stat.Grids++
 	}

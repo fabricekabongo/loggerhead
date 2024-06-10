@@ -13,7 +13,7 @@ type LocationBroadcast struct {
 	notify chan<- struct{}
 }
 
-func NewLocationBroadcast(location world.LocationEntity) *LocationBroadcast {
+func NewLocationBroadcast(location world.Location) *LocationBroadcast {
 	var msg bytes.Buffer
 
 	enc := gob.NewEncoder(&msg)
@@ -24,7 +24,7 @@ func NewLocationBroadcast(location world.LocationEntity) *LocationBroadcast {
 	}
 
 	return &LocationBroadcast{
-		locId:  location.LocId,
+		locId:  location.Id,
 		msg:    msg.Bytes(),
 		notify: make(chan struct{}),
 	}

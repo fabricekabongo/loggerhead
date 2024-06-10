@@ -77,14 +77,14 @@ func (d *BroadcastDelegate) NotifyMsg(buf []byte) {
 	if len(buf) > 0 {
 		dec := gob.NewDecoder(bytes.NewReader(buf))
 		// Process the message
-		var location world.LocationEntity
+		var location world.Location
 
 		err := dec.Decode(&location)
 		if err != nil {
 			return
 		}
 
-		err = d.state.World.Save(location.LocId, location.Lat, location.Lon)
+		err = d.state.World.Save(location.Id, location.Lat, location.Lon)
 		if err != nil {
 			return
 		}
@@ -133,7 +133,7 @@ func (d *BroadcastDelegate) MergeRemoteState(buf []byte, join bool) {
 
 	go func(worldMap world.Map) {
 		for _, loc := range worldMap.Locations {
-			err := d.state.World.Save(loc.LocId, loc.Lat, loc.Lon)
+			err := d.state.World.Save(loc.Id, loc.Lat, loc.Lon)
 			if err != nil {
 				continue
 			}

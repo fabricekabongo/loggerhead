@@ -82,10 +82,10 @@ func (w *WriteHandler) handleWriteConnection(conn net.Conn) {
 }
 
 func (w *WriteHandler) handleWriterCommand(line []byte) {
-	var location world.LocationEntity
+	var location world.Location
 	err := json.Unmarshal(line, &location)
 
-	go func(location world.LocationEntity) {
+	go func(location world.Location) {
 		broadcast := clustering.NewLocationBroadcast(location)
 		w.Broadcasts.QueueBroadcast(broadcast)
 	}(location)
@@ -95,7 +95,7 @@ func (w *WriteHandler) handleWriterCommand(line []byte) {
 		return
 	}
 
-	err = w.WorldMap.Save(location.LocId, location.Lat, location.Lon)
+	err = w.WorldMap.Save(location.Id, location.Lat, location.Lon)
 	if err != nil {
 		log.Println("Error saving location to map: ", err)
 		return

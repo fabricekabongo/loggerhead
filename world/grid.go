@@ -1,6 +1,7 @@
 package world
 
 import (
+	"errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"sync"
@@ -15,6 +16,7 @@ var (
 		Name: "geo_db_grid_processed_ops_total",
 		Help: "The total number of processed operations by the grid",
 	})
+	ErrorGridNameRequired = errors.New("grid name is required")
 )
 
 type LocationUpdateEvent struct {
@@ -37,97 +39,115 @@ type LocationDeletedEvent struct {
 
 type Grid struct {
 	Name                   string
-	locations              map[string]*LocationEntity
+	namespaces             map[string]map[string]*Location
 	AddEventSubscribers    map[string]chan LocationAddedEvent
 	UpdateEventSubscribers map[string]chan LocationUpdateEvent
 	DeleteEventSubscribers map[string]chan LocationDeletedEvent
 	mu                     sync.RWMutex
 }
 
-func NewGrid(name string) *Grid {
-
+func NewGrid(name string) (*Grid, error) {
+	if len(name) == 0 {
+		return nil, ErrorGridNameRequired
+	}
 	return &Grid{
 		Name:                   name,
-		locations:              make(map[string]*LocationEntity),
+		namespaces:             make(map[string]map[string]*Location),
 		AddEventSubscribers:    make(map[string]chan LocationAddedEvent),
 		UpdateEventSubscribers: make(map[string]chan LocationUpdateEvent),
 		DeleteEventSubscribers: make(map[string]chan LocationDeletedEvent),
 		mu:                     sync.RWMutex{},
-	}
+	}, nil
 }
 
-func (g *Grid) DeleteLocation(loc *LocationEntity) {
+func (g *Grid) DeleteLocation(loc *Location) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	defer metricGauge.WithLabelValues(g.Name).Dec()
 	defer opsProcessed.Inc()
 
-	if len(loc.LocId) == 0 {
-		panic("locationId is required. It should have never reached the grid")
-	}
-	_, ok := g.locations[loc.LocId]
+	namespace, _ := g.namespaces[loc.Ns]
 
-	if !ok {
-		return
-	}
+	delete(namespace, loc.Id)
 
-	delete(g.locations, loc.LocId)
-
-	go func() {
-		for _, subscriber := range g.DeleteEventSubscribers {
-			subscriber <- LocationDeletedEvent{LocId: loc.LocId}
-		}
-
-	}()
+	//go func() {
+	//	for _, subscriber := range g.DeleteEventSubscribers {
+	//		subscriber <- LocationDeletedEvent{LocId: loc.Id}
+	//	}
+	//}()
 }
 
-func (g *Grid) UpdateLocation(loc *LocationEntity, lat float64, lon float64) error {
+func (g *Grid) UpdateLocation(ns string, loc *Location, lat float64, lon float64) error {
 	g.mu.Lock()
 	defer metricGauge.WithLabelValues(g.Name).Inc()
 	defer opsProcessed.Inc()
 
-	_, ok := g.locations[loc.LocId]
-	if !ok {
-		panic("Location is not in the grid. Update should have never reached the grid")
+	if len(loc.Id) == 0 {
+		panic("locationId is required. It should have never reached the grid")
 	}
-	prevLat := g.locations[loc.LocId].Lat
-	prevLon := g.locations[loc.LocId].Lon
 
-	g.locations[loc.LocId].Lat = lat
-	g.locations[loc.LocId].Lon = lon
+	if len(ns) == 0 {
+		panic("namespace is required. It should have never reached the grid")
+	}
 
-	go func() {
-		for _, subscriber := range g.UpdateEventSubscribers {
-			subscriber <- LocationUpdateEvent{
-				LocId:   loc.LocId,
-				Lat:     lat,
-				Lon:     lon,
-				PrevLat: prevLat,
-				PrevLon: prevLon,
-			}
-		}
-	}()
+	//_, ok := g.locations[loc.Id]
+	//if !ok {
+	//	panic("Location is not in the grid. Update should have never reached the grid")
+	//}
+	//prevLat := g.locations[loc.Id].Lat
+	//prevLon := g.locations[loc.Id].Lon
+	//
+	//g.locations[loc.Id].Lat = lat
+	//g.locations[loc.Id].Lon = lon
+	//
+	//go func() {
+	//	for _, subscriber := range g.UpdateEventSubscribers {
+	//		subscriber <- LocationUpdateEvent{
+	//			Id:   loc.Id,
+	//			Lat:     lat,
+	//			Lon:     lon,
+	//			PrevLat: prevLat,
+	//			PrevLon: prevLon,
+	//		}
+	//	}
+	//}()
 
 	return nil
 }
 
-func (g *Grid) AddLocation(loc *LocationEntity) {
+func (g *Grid) AddLocation(loc *Location) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	defer opsProcessed.Inc()
 	defer metricGauge.WithLabelValues(g.Name).Inc()
-	_, ok := g.locations[loc.LocId]
+
+	_, ok := g.namespaces[loc.Ns]
 	if ok {
-		panic("Location already exists in the grid. Add should have never reached the grid")
+		g.namespaces[loc.Ns][loc.Id] = loc
+	} else {
+		g.namespaces[loc.Ns] = make(map[string]*Location)
+		g.namespaces[loc.Ns][loc.Id] = loc
 	}
 
-	go func() {
-		for _, subscriber := range g.AddEventSubscribers {
-			subscriber <- LocationAddedEvent{
-				LocId: loc.LocId,
-				Lat:   loc.Lat,
-				Lon:   loc.Lon,
-			}
-		}
-	}()
+	//go func() {
+	//	for _, subscriber := range g.AddEventSubscribers {
+	//		subscriber <- LocationAddedEvent{
+	//			Id: loc.Id,
+	//			Lat:   loc.Lat,
+	//			Lon:   loc.Lon,
+	//		}
+	//	}
+	//}()
+}
+
+func (g *Grid) GetLocations(ns string) map[string]*Location {
+	g.mu.RLock()
+	defer g.mu.RUnlock()
+
+	namespace, ok := g.namespaces[ns]
+	if !ok {
+		return map[string]*Location{}
+	}
+
+	return namespace
 }

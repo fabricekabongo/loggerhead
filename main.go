@@ -29,7 +29,7 @@ func main() {
 
 	flag.Parse()
 
-	gob.Register(&world.LocationEntity{})
+	gob.Register(&world.Location{})
 	gob.Register(&world.Grid{})
 	gob.Register(&world.Map{})
 

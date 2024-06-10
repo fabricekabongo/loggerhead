@@ -43,6 +43,7 @@ type Grid struct {
 	AddEventSubscribers    map[string]chan LocationAddedEvent
 	UpdateEventSubscribers map[string]chan LocationUpdateEvent
 	DeleteEventSubscribers map[string]chan LocationDeletedEvent
+	index                  map[string]string
 	mu                     sync.RWMutex
 }
 
@@ -120,10 +121,16 @@ func (g *Grid) AddLocation(loc *Location) {
 	defer g.mu.Unlock()
 	defer opsProcessed.Inc()
 	defer metricGauge.WithLabelValues(g.Name).Inc()
+	namespace, ok := g.namespaces[loc.Ns]
 
-	_, ok := g.namespaces[loc.Ns]
 	if ok {
-		g.namespaces[loc.Ns][loc.Id] = loc
+		location, exists := namespace[loc.Id]
+		if exists {
+			location.Lat = loc.Lat
+			location.Lon = loc.Lon
+		} else {
+			namespace[loc.Id] = loc
+		}
 	} else {
 		g.namespaces[loc.Ns] = make(map[string]*Location)
 		g.namespaces[loc.Ns][loc.Id] = loc

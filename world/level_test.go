@@ -100,6 +100,110 @@ func TestLevel(t *testing.T) {
 				t.Errorf("The location should be the same. Expect %v got %v instead", loc, location)
 			}
 		})
+		t.Run("It should update the location in the same grid", func(t *testing.T) {
+			t.Parallel()
+			level := rand.Intn(15)
+			l, _ := NewLevel(int8(level))
+
+			loc1, err, _, _, _, _ := CreateRandomTestLocation()
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+			loc2, err := NewLocation(loc1.Ns, loc1.Id, loc1.Lat+0.00000000000000001, loc1.Lon+0.00000000000000001) //Very small change to accommodate for the smallest possible grid
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+
+			err = l.PlaceLocation(loc1)
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+
+			geo := h3.GeoCoord{
+				Latitude:  loc1.Lat,
+				Longitude: loc1.Lon,
+			}
+
+			geoHash := h3.FromGeo(geo, level)
+			geoHashString := h3.ToString(geoHash)
+
+			grid := l.Grids[geoHashString]
+			locations := grid.GetLocations(loc1.Ns)
+			location, _ := locations[loc1.Id]
+			if location != loc1 {
+				t.Errorf("The location should be the same. Expect %v got %v instead", loc1, location)
+			}
+
+			err = l.PlaceLocation(loc2)
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+
+			locations = grid.GetLocations(loc1.Ns)
+			location, _ = locations[loc1.Id]
+			if location == loc2 {
+				t.Errorf("It should have updated the original location")
+			}
+
+			if location.Lat != loc2.Lat || location.Lon != loc2.Lon || location.Ns != loc2.Ns || location.Id != loc2.Id {
+				t.Errorf("The location's information should be the same. Expect Lat: exp %v instead %v, Lon: exp %v instead %v, Id: exp %v instead %v, NS: exp %v instead %v", loc2.Lat, location.Lat, loc2.Lon, location.Lon, loc2.Id, location.Id, loc2.Ns, location.Ns)
+			}
+		})
+		t.Run("It should update the location and move to another grid when provided a new object", func(t *testing.T) {
+			t.Parallel()
+			level := 15
+			l, _ := NewLevel(int8(level))
+
+			loc1, err, _, _, _, _ := CreateRandomTestLocation()
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+			loc2, err := NewLocation(loc1.Ns, loc1.Id, loc1.Lat+1, loc1.Lon+1) //Very big change to force moving to another grid
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+
+			err = l.PlaceLocation(loc1)
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+			err = l.PlaceLocation(loc2)
+			if err != nil {
+				t.Errorf("Expected no error, got %v", err)
+			}
+
+			geo := h3.GeoCoord{
+				Latitude:  loc1.Lat,
+				Longitude: loc1.Lon,
+			}
+
+			geoHash := h3.FromGeo(geo, level)
+			geoHashString := h3.ToString(geoHash)
+
+			grid := l.Grids[geoHashString]
+			locations := grid.GetLocations(loc1.Ns)
+			location, _ := locations[loc1.Id]
+			if location == loc1 {
+				t.Errorf("The location shouldn't be in the initial grid")
+			}
+
+			geo = h3.GeoCoord{
+				Latitude:  loc2.Lat,
+				Longitude: loc2.Lon,
+			}
+
+			geoHash = h3.FromGeo(geo, level)
+			geoHashString = h3.ToString(geoHash)
+
+			grid2 := l.Grids[geoHashString]
+
+			locations = grid2.GetLocations(loc1.Ns)
+			location, _ = locations[loc1.Id]
+
+			if location.Lat != loc2.Lat || location.Lon != loc2.Lon || location.Ns != loc2.Ns || location.Id != loc2.Id {
+				t.Errorf("The location's information should be the same. Expect Lat: exp %v instead %v, Lon: exp %v instead %v, Id: exp %v instead %v, NS: exp %v instead %v", loc2.Lat, location.Lat, loc2.Lon, location.Lon, loc2.Id, location.Id, loc2.Ns, location.Ns)
+			}
+		})
 	})
 
 	t.Run("DeleteLocation", func(t *testing.T) {
@@ -159,4 +263,5 @@ func TestLevel(t *testing.T) {
 			l.DeleteLocation(loc)
 		})
 	})
+
 }

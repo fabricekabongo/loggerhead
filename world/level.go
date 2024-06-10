@@ -2,7 +2,6 @@ package world
 
 import (
 	"errors"
-	"fmt"
 	"github.com/uber/h3-go"
 	"log"
 )
@@ -14,6 +13,8 @@ var (
 type Level struct {
 	Level int8
 	Grids map[string]*Grid
+
+	index map[string]string
 }
 
 func NewLevel(level int8) (*Level, error) {
@@ -24,6 +25,7 @@ func NewLevel(level int8) (*Level, error) {
 	return &Level{
 		Level: level,
 		Grids: make(map[string]*Grid),
+		index: make(map[string]string),
 	}, nil
 }
 
@@ -32,11 +34,21 @@ func (l *Level) PlaceLocation(loc *Location) error {
 		return LocationErrorRequiredId
 	}
 
+	gridKey, ok := l.index[loc.Id]
+	var currentGrid *Grid
+
+	if ok {
+		currentGrid = l.Grids[gridKey]
+	}
+
 	grid := l.getGrid(loc)
 
-	fmt.Println("grid", grid)
+	if currentGrid != nil && currentGrid.Name != grid.Name {
+		currentGrid.DeleteLocation(loc)
+	}
 
 	grid.AddLocation(loc)
+	l.index[loc.Id] = grid.Name
 
 	return nil
 }

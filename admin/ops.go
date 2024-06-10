@@ -31,10 +31,10 @@ func init() {
 
 type OpsServer struct {
 	mList *memberlist.Memberlist
-	world *world.Map
+	world *world.World
 }
 
-func NewOpsServer(mList *memberlist.Memberlist, world *world.Map) *OpsServer {
+func NewOpsServer(mList *memberlist.Memberlist, world *world.World) *OpsServer {
 	return &OpsServer{mList: mList, world: world}
 }
 

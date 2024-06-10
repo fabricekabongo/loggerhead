@@ -14,11 +14,11 @@ type SubscribeCommand struct {
 }
 
 type ReadHandler struct {
-	WorldMap  *world.Map
+	WorldMap  *world.World
 	closeChan chan struct{}
 }
 
-func NewReadHandler(world *world.Map) *ReadHandler {
+func NewReadHandler(world *world.World) *ReadHandler {
 	return &ReadHandler{
 		WorldMap:  world,
 		closeChan: make(chan struct{}),
@@ -97,23 +97,23 @@ func (r *ReadHandler) handleReadConnection(conn net.Conn) {
 			return
 		}
 
-		grid, ok := r.WorldMap.Grids[command.GridName] // Grid should almost always exist but okay
-		if !ok {
-			log.Println("Grid not found: ", command.GridName)
-			_, err := conn.Write([]byte("Grid not found\n"))
-			if err != nil {
-				return
-			}
-			err = conn.Close()
-			if err != nil {
-				return
-			}
-			return
-		}
-
-		grid.AddEventSubscribers[conn.RemoteAddr().String()] = addSub
-		grid.UpdateEventSubscribers[conn.RemoteAddr().String()] = updateSub
-		grid.DeleteEventSubscribers[conn.RemoteAddr().String()] = deleteSub
+		//grid, ok := r.WorldMap.Grids[command.GridName] // Grid should almost always exist but okay
+		//if !ok {
+		//	log.Println("Grid not found: ", command.GridName)
+		//	_, err := conn.Write([]byte("Grid not found\n"))
+		//	if err != nil {
+		//		return
+		//	}
+		//	err = conn.Close()
+		//	if err != nil {
+		//		return
+		//	}
+		//	return
+		//}
+		//
+		//grid.AddEventSubscribers[conn.RemoteAddr().String()] = addSub
+		//grid.UpdateEventSubscribers[conn.RemoteAddr().String()] = updateSub
+		//grid.DeleteEventSubscribers[conn.RemoteAddr().String()] = deleteSub
 	}
 }
 

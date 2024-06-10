@@ -18,12 +18,12 @@ type WriteCommand struct {
 }
 
 type WriteHandler struct {
-	WorldMap   *world.Map
+	WorldMap   *world.World
 	closeChan  chan struct{}
 	Broadcasts *memberlist.TransmitLimitedQueue
 }
 
-func NewWriteHandler(world *world.Map, broadcasts *memberlist.TransmitLimitedQueue) *WriteHandler {
+func NewWriteHandler(world *world.World, broadcasts *memberlist.TransmitLimitedQueue) *WriteHandler {
 	return &WriteHandler{
 		WorldMap:   world,
 		closeChan:  make(chan struct{}),
@@ -95,7 +95,7 @@ func (w *WriteHandler) handleWriterCommand(line []byte) {
 		return
 	}
 
-	err = w.WorldMap.Save(location.Id, location.Lat, location.Lon)
+	err = w.WorldMap.Save(location.Ns, location.Id, location.Lat, location.Lon)
 	if err != nil {
 		log.Println("Error saving location to map: ", err)
 		return

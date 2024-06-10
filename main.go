@@ -31,9 +31,9 @@ func main() {
 
 	gob.Register(&world.Location{})
 	gob.Register(&world.Grid{})
-	gob.Register(&world.Map{})
+	gob.Register(&world.World{})
 
-	worldMap := world.NewMap()
+	worldMap := world.NewWorld()
 
 	mList, broadcasts, err := createClustering(clusterDNS, worldMap)
 	if errors.Is(err, FailedToCreateCluster) {
@@ -74,7 +74,7 @@ func main() {
 	server.Start()
 }
 
-func createClustering(clusterDNS string, world *world.Map) (*memberlist.Memberlist, *memberlist.TransmitLimitedQueue, error) {
+func createClustering(clusterDNS string, world *world.World) (*memberlist.Memberlist, *memberlist.TransmitLimitedQueue, error) {
 	broadcasts := &memberlist.TransmitLimitedQueue{
 		NumNodes: func() int {
 			return 1 // Replace with the actual number of nodes

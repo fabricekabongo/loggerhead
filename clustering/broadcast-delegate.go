@@ -49,10 +49,7 @@ func (d *BroadcastDelegate) NodeMeta(limit int) []byte {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
-	stats := d.state.World.Stats()
 	metaData := NodeMetaData{
-		Locations: stats.Locations,
-		Grids:     stats.Grids,
 		MemStats: MemStats{
 			Alloc:      (memStats.Alloc / 1024) / 1024,
 			TotalAlloc: (memStats.TotalAlloc / 1024) / 1024,

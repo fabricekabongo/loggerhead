@@ -13,10 +13,8 @@ type Stats struct {
 }
 
 type World struct {
-	levels     map[int8]*Level
-	namespaces map[string]*Namespace
-	mu         sync.RWMutex // to protect the location
-	stat       Stats
+	levels     *sync.Map
+	namespaces *sync.Map
 }
 
 func init() {
@@ -25,29 +23,20 @@ func init() {
 }
 
 func NewWorld() *World {
-	var levels = make(map[int8]*Level, 16)
+	var levels = &sync.Map{}
 	for i := int8(0); i < 16; i++ {
 		level, err := NewLevel(i)
 		if err != nil {
 			log.Fatalf("Error creating level: %v", err)
 		}
 
-		levels[i] = level
+		levels.Store(i, level)
 	}
 
 	return &World{
 		levels:     levels,
-		namespaces: make(map[string]*Namespace),
-		mu:         sync.RWMutex{},
-		stat:       Stats{},
+		namespaces: &sync.Map{},
 	}
-}
-
-func (m *World) Stats() Stats {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
-	return m.stat
 }
 
 func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
@@ -69,34 +58,40 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 		location.Lat = lat
 		location.Lon = lon
 	}
+	var topErr error
 
-	for _, level := range m.levels {
+	m.levels.Range(func(key, value interface{}) bool {
+		level := value.(*Level)
 		err := level.PlaceLocation(location)
 		if err != nil {
-			return err
+			topErr = err
+			return false
 		}
-	}
+		return true
+	})
 
-	return nil
+	return topErr
 }
 
 func (m *World) getNamespace(ns string) *Namespace {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
-	_, ok := m.namespaces[ns]
+	_, ok := m.namespaces.Load(ns)
 
 	if !ok {
-		m.namespaces[ns] = NewNamespace(ns)
+		newNamespace := NewNamespace(ns)
+
+		m.namespaces.Store(ns, newNamespace)
 	}
 
-	return m.namespaces[ns]
+	namespace, ok := m.namespaces.Load(ns)
+
+	if !ok {
+		panic("sync.Map is not saving data")
+	}
+
+	return namespace.(*Namespace)
 }
 
 func (m *World) ToBytes() []byte {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-
 	var buf bytes.Buffer
 
 	enc := gob.NewEncoder(&buf)
@@ -124,14 +119,30 @@ func NewWorldFromBytes(buf []byte) *World {
 }
 
 func (m *World) Merge(w *World) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	w.namespaces.Range(func(key, ns interface{}) bool {
+		m.namespaces.Store(key, ns)
+		return true
 
-	for ns, n := range w.namespaces {
-		m.namespaces[ns] = n
+	})
+
+	w.levels.Range(func(key, level interface{}) bool {
+		m.levels.Store(key, level)
+		return true
+	})
+}
+
+func (m *World) GetLocation(ns string, id string) (Location, bool) {
+	namespace := m.getNamespace(ns)
+
+	if namespace == nil {
+		return Location{}, false
 	}
 
-	for l, level := range w.levels {
-		m.levels[l] = level
+	location, ok := namespace.locations[id]
+
+	if !ok {
+		return Location{}, false
 	}
+
+	return *location, true
 }

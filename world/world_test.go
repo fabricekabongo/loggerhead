@@ -6,8 +6,11 @@ import (
 )
 
 func TestWorld(t *testing.T) {
+	t.Parallel()
 	t.Run("Save", func(t *testing.T) {
+		t.Parallel()
 		t.Run("Should save a new location", func(t *testing.T) {
+			t.Parallel()
 			world := NewWorld()
 
 			err := world.Save("ns", "locId", 1.0, 1.0)
@@ -32,6 +35,7 @@ func TestWorld(t *testing.T) {
 		})
 
 		t.Run("Should update an existing location", func(t *testing.T) {
+			t.Parallel()
 			world := NewWorld()
 
 			err := world.Save("ns", "locId", 1.0, 1.0)
@@ -61,6 +65,7 @@ func TestWorld(t *testing.T) {
 		})
 
 		t.Run("Should save location to all levels", func(t *testing.T) {
+			t.Parallel()
 			world := NewWorld()
 
 			err := world.Save("ns", "locId", 1.0, 1.0)
@@ -68,7 +73,8 @@ func TestWorld(t *testing.T) {
 				t.Fatalf("Error saving location: %v", err)
 			}
 
-			for _, level := range world.levels {
+			world.levels.Range(func(key, value interface{}) bool {
+				level := value.(*Level)
 				geo := h3.GeoCoord{
 					Latitude:  1.0,
 					Longitude: 1.0,
@@ -92,7 +98,34 @@ func TestWorld(t *testing.T) {
 				if level.Grids[geoHashString].namespaces["ns"]["locId"] == nil {
 					t.Fatalf("Expected location to be saved to all levels")
 				}
+
+				return true
+			})
+		})
+	})
+
+	t.Run("GetLocation", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Should return a location", func(t *testing.T) {
+			t.Parallel()
+			world := NewWorld()
+
+			err := world.Save("ns", "locId", 1.0, 1.0)
+
+			if err != nil {
+				t.Fatalf("Error saving location: %v", err)
 			}
+
+			loc, found := world.GetLocation("ns", "locId")
+
+			if !found {
+				t.Fatalf("Expected location to be returned")
+			}
+
+			if loc.Lat != 1.0 || loc.Lon != 1.0 || loc.Id != "locId" || loc.Ns != "ns" {
+				t.Fatalf("Expected location to be returned")
+			}
+
 		})
 	})
 }

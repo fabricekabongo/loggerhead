@@ -26,10 +26,6 @@ func TestLevel(t *testing.T) {
 			if l.Level != 5 {
 				t.Errorf("Expected name to be test, got %d", l.Level)
 			}
-
-			if l.Grids == nil {
-				t.Error("Grids should be initialized")
-			}
 		})
 
 		t.Run("It should fail if level is lower than 0", func(t *testing.T) {
@@ -85,12 +81,9 @@ func TestLevel(t *testing.T) {
 				t.Errorf("Expected no error, got %v", err)
 			}
 
-			if len(l.Grids) != 1 {
-				t.Errorf("Expected grids to have 1 element, got %d", len(l.Grids))
-			}
-
-			grid := l.Grids[geoHashString]
-			if grid == nil {
+			v, ok := l.Grids.Load(geoHashString)
+			grid := v.(*Grid)
+			if !ok {
 				t.Error("Grid should not be nil")
 			}
 
@@ -127,7 +120,8 @@ func TestLevel(t *testing.T) {
 			geoHash := h3.FromGeo(geo, level)
 			geoHashString := h3.ToString(geoHash)
 
-			grid := l.Grids[geoHashString]
+			v, _ := l.Grids.Load(geoHashString)
+			grid := v.(*Grid)
 			locations := grid.GetLocations(loc1.Ns)
 			location, _ := locations[loc1.Id]
 			if location != loc1 {
@@ -180,7 +174,8 @@ func TestLevel(t *testing.T) {
 			geoHash := h3.FromGeo(geo, level)
 			geoHashString := h3.ToString(geoHash)
 
-			grid := l.Grids[geoHashString]
+			v, _ := l.Grids.Load(geoHashString)
+			grid := v.(*Grid)
 			locations := grid.GetLocations(loc1.Ns)
 			location, _ := locations[loc1.Id]
 			if location == loc1 {
@@ -195,7 +190,8 @@ func TestLevel(t *testing.T) {
 			geoHash = h3.FromGeo(geo, level)
 			geoHashString = h3.ToString(geoHash)
 
-			grid2 := l.Grids[geoHashString]
+			v, _ = l.Grids.Load(geoHashString)
+			grid2 := v.(*Grid)
 
 			locations = grid2.GetLocations(loc1.Ns)
 			location, _ = locations[loc1.Id]
@@ -227,7 +223,8 @@ func TestLevel(t *testing.T) {
 
 			err = l.PlaceLocation(loc)
 
-			grid := l.Grids[geoHashString]
+			v, _ := l.Grids.Load(geoHashString)
+			grid := v.(*Grid)
 
 			l.DeleteLocation(loc)
 
@@ -255,8 +252,8 @@ func TestLevel(t *testing.T) {
 			geoHash := h3.FromGeo(geo, level)
 			geoHashString := h3.ToString(geoHash)
 
-			grid := l.Grids[geoHashString]
-			if grid != nil {
+			_, ok := l.Grids.Load(geoHashString)
+			if ok {
 				t.Errorf("No grid should have even been created")
 			}
 

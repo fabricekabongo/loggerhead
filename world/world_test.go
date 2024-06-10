@@ -83,19 +83,34 @@ func TestWorld(t *testing.T) {
 				geoHash := h3.FromGeo(geo, int(level.Level))
 				geoHashString := h3.ToString(geoHash)
 
-				if level.index["locId"] != geoHashString {
+				v, _ := level.index.Load("locId")
+				gridName := v.(string)
+				if gridName != geoHashString {
 					t.Fatalf("Expected location to be saved to all levels")
 				}
 
-				if level.Grids[geoHashString] == nil {
+				v, ok := level.Grids.Load(geoHashString)
+				if !ok {
 					t.Fatalf("Expected location to be saved to all levels")
 				}
 
-				if level.Grids[geoHashString].namespaces["ns"] == nil {
+				grid, ok := v.(*Grid)
+				if !ok {
+					t.Fatalf("Expected value to be of type *Grid")
+				}
+
+				v, ok = grid.namespaces["ns"]
+				if !ok {
 					t.Fatalf("Expected location to be saved to all levels")
 				}
 
-				if level.Grids[geoHashString].namespaces["ns"]["locId"] == nil {
+				namespace, ok := v.(map[string]*Location)
+				if !ok {
+					t.Fatalf("Expected value to be of type map[string]*Location")
+				}
+
+				_, ok = namespace["locId"]
+				if !ok {
 					t.Fatalf("Expected location to be saved to all levels")
 				}
 

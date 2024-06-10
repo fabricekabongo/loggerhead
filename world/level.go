@@ -5,6 +5,7 @@ import (
 	"errors"
 	"github.com/uber/h3-go"
 	"log"
+	"sync"
 )
 
 var (
@@ -17,9 +18,8 @@ func init() {
 
 type Level struct {
 	Level int8
-	Grids map[string]*Grid
-
-	index map[string]string
+	Grids sync.Map
+	index sync.Map
 }
 
 func NewLevel(level int8) (*Level, error) {
@@ -29,8 +29,8 @@ func NewLevel(level int8) (*Level, error) {
 
 	return &Level{
 		Level: level,
-		Grids: make(map[string]*Grid),
-		index: make(map[string]string),
+		Grids: sync.Map{},
+		index: sync.Map{},
 	}, nil
 }
 
@@ -39,22 +39,26 @@ func (l *Level) PlaceLocation(loc *Location) error {
 		return LocationErrorRequiredId
 	}
 
-	gridKey, ok := l.index[loc.Id]
+	iVal, ok := l.index.Load(loc.Id)
 	var currentGrid *Grid
 
 	if ok {
-		currentGrid = l.Grids[gridKey]
+		key := iVal.(string)
+		gVal, found := l.Grids.Load(key)
+		if found {
+			currentGrid = gVal.(*Grid)
+		}
 	}
 
 	grid := l.getGrid(loc)
 
 	if currentGrid != nil && currentGrid.Name != grid.Name {
 		currentGrid.DeleteLocation(loc)
-		delete(l.index, loc.Id)
+		l.index.Delete(loc.Id)
 	}
 
 	grid.AddLocation(loc)
-	l.index[loc.Id] = grid.Name
+	l.index.Store(loc.Id, grid.Name)
 
 	return nil
 }
@@ -69,7 +73,7 @@ func (l *Level) getGrid(loc *Location) *Grid {
 
 	geoHashString := h3.ToString(geoHash)
 
-	grid, ok := l.Grids[geoHashString]
+	grid, ok := l.Grids.Load(geoHashString)
 
 	if !ok {
 		newGrid, err := NewGrid(geoHashString)
@@ -78,12 +82,12 @@ func (l *Level) getGrid(loc *Location) *Grid {
 			log.Fatal(err)
 		}
 
-		l.Grids[geoHashString] = newGrid
+		l.Grids.Store(geoHashString, newGrid)
 
 		grid = newGrid
 	}
 
-	return grid
+	return grid.(*Grid)
 }
 
 func (l *Level) DeleteLocation(loc *Location) {

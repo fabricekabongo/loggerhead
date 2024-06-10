@@ -45,6 +45,7 @@ func (l *Level) PlaceLocation(loc *Location) error {
 
 	if currentGrid != nil && currentGrid.Name != grid.Name {
 		currentGrid.DeleteLocation(loc)
+		delete(l.index, loc.Id)
 	}
 
 	grid.AddLocation(loc)

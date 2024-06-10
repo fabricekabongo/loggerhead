@@ -46,8 +46,4 @@ func TestGrid(t *testing.T) {
 			t.Error("DeleteEventSubscribers should be initialized")
 		}
 	})
-
-	t.Run("SaveLocation", func(t *testing.T) {
-
-	})
 }

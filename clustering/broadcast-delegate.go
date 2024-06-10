@@ -11,7 +11,6 @@ import (
 
 func init() {
 	gob.Register(NodeMetaData{})
-	gob.Register(world.Stats{})
 }
 
 type BroadcastDelegate struct {

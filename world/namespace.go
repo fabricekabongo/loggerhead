@@ -1,6 +1,13 @@
 package world
 
-import "sync"
+import (
+	"encoding/gob"
+	"sync"
+)
+
+func init() {
+	gob.Register(Namespace{})
+}
 
 type Namespace struct {
 	Name      string

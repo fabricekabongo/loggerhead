@@ -1,6 +1,7 @@
 package world
 
 import (
+	"encoding/gob"
 	"errors"
 	"github.com/uber/h3-go"
 	"log"
@@ -9,6 +10,10 @@ import (
 var (
 	LevelErrorInvalidLevel = errors.New("level must be greater than 0 and less than 16")
 )
+
+func init() {
+	gob.Register(Level{})
+}
 
 type Level struct {
 	Level int8

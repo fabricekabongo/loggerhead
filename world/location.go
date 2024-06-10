@@ -1,6 +1,9 @@
 package world
 
-import "errors"
+import (
+	"encoding/gob"
+	"errors"
+)
 
 var (
 	LocationErrorRequiredId        = errors.New("location id is required")
@@ -8,6 +11,10 @@ var (
 	LocationErrorInvalidLongitude  = errors.New("invalid longitude")
 	LocationErrorRequiredNamespace = errors.New("namespace is required")
 )
+
+func init() {
+	gob.Register(Location{})
+}
 
 type Location struct {
 	Id  string  `json:"id"`

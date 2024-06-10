@@ -1,6 +1,7 @@
 package world
 
 import (
+	"encoding/gob"
 	"errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -18,6 +19,13 @@ var (
 	})
 	ErrorGridNameRequired = errors.New("grid name is required")
 )
+
+func init() {
+	gob.Register(Grid{})
+	gob.Register(LocationUpdateEvent{})
+	gob.Register(LocationAddedEvent{})
+	gob.Register(LocationDeletedEvent{})
+}
 
 type LocationUpdateEvent struct {
 	LocId   string  `json:"loc_id"`

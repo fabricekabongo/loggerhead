@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/gob"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,14 +23,10 @@ var (
 )
 
 func main() {
-
+	start := time.Now()
 	populateEnv()
 
 	flag.Parse()
-
-	gob.Register(&world.Location{})
-	gob.Register(&world.Grid{})
-	gob.Register(&world.World{})
 
 	worldMap := world.NewWorld()
 
@@ -71,6 +66,10 @@ func main() {
 
 	server := server2.NewServer(*writer, *reader)
 
+	end := time.Now()
+	fmt.Println("Startup time: ", end.Sub(start))
+
+	defer server.Stop()
 	server.Start()
 }
 
@@ -94,10 +93,6 @@ func createClustering(clusterDNS string, world *world.World) (*memberlist.Member
 	config.BindPort = 20001
 	config.AdvertisePort = 20001
 	config.Delegate = delegate
-
-	if err != nil {
-		log.Println("Failed to get hostname: ", err)
-	}
 
 	mList, err := memberlist.Create(config)
 	if err != nil {

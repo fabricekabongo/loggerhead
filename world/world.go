@@ -21,11 +21,7 @@ type World struct {
 
 func init() {
 	gob.Register(World{})
-	gob.Register(Level{})
-	gob.Register(Grid{})
-	gob.Register(Location{})
-	gob.Register(Namespace{})
-
+	gob.Register(Stats{})
 }
 
 func NewWorld() *World {

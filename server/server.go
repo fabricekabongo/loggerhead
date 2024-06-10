@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net"
 )
 
@@ -24,6 +25,7 @@ func (s *Server) Stop() {
 }
 
 func (s *Server) Start() {
+	fmt.Println("Opening read and write ports")
 	writerListener, err := net.Listen("tcp", ":19999")
 	if err != nil {
 		panic(err)
@@ -37,5 +39,6 @@ func (s *Server) Start() {
 	go s.WriteHandler.listen(writerListener)
 	go s.ReadHandler.listen(subscriberListener)
 
+	fmt.Println("Read and Write operations ready. Enjoy!")
 	<-s.closeChannel
 }

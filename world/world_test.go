@@ -171,10 +171,15 @@ func TestWorld(t *testing.T) {
 				t.Fatalf("Error saving location: %v", err)
 			}
 
-			locations := world.GetLocationsInRadius("ns", 1.0, 1.0, 500)
+			locationsMap := world.GetLocationsInRadius("ns", 1.0, 1.0, 500)
 
-			if len(locations) != 2 {
-				t.Fatalf("Expected 2 location to be returned, got %v locations", len(locations))
+			locCount := 0
+			for _, locations := range locationsMap {
+				locCount += len(locations)
+			}
+
+			if locCount != 2 {
+				t.Fatalf("Expected 2 locations to be returned, got %v locations", locCount)
 			}
 		})
 

@@ -1,4 +1,4 @@
-# Loggerhead
+# Loggerhead (in progress, I'm finishing the query processor so you can use, right now you can only save data)
 
 Loggerhead is geolocation database built in go. It is designed to be fast and efficient, and to be used in a distributed
 like kubernetes.

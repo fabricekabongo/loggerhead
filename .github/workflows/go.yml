@@ -27,9 +27,6 @@ jobs:
     - name: Test
       run: go test -v ./...
 
-    - name: Perform the benchmark
-      run: cd world && go test -bench=. -benchtime=10s -benchmem
-
   Go_1_22_4:
     runs-on: ubuntu-latest
     steps:
@@ -45,6 +42,3 @@ jobs:
 
       - name: Test
         run: go test -v ./...
-
-      - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchtime=10s -benchmem

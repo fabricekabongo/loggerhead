@@ -72,7 +72,7 @@ func BenchmarkWorld(b *testing.B) {
 	})
 
 	b.Run("GetLocationsInRadius", func(b *testing.B) {
-		b.Run("Should return locations in radius", func(b *testing.B) {
+		b.Run("Should return locations in radius 1000km", func(b *testing.B) {
 			world := NewWorld()
 
 			for i := 0; i < b.N; i++ {
@@ -94,6 +94,54 @@ func BenchmarkWorld(b *testing.B) {
 				}
 
 				_ = world.GetLocationsInRadius("ns", loc["lat"], loc["lon"], 1000000)
+			}
+		})
+		b.Run("Should return locations in radius 100km", func(b *testing.B) {
+			world := NewWorld()
+
+			for i := 0; i < b.N; i++ {
+				loc := locs[i%uniqueRecords]
+				id := ids[i%uniqueRecords]
+
+				err := world.Save(id["ns"], id["id"], loc["lat"], loc["lon"])
+				if err != nil {
+					b.Fatalf("Error saving location: %v", err)
+				}
+
+				loc2 := locs[(i+1)%uniqueRecords]
+				id2 := ids[(i+1)%uniqueRecords]
+
+				err = world.Save(id2["ns"], id2["id"], loc2["lat"], loc2["lon"])
+
+				if err != nil {
+					b.Fatalf("Error saving location: %v", err)
+				}
+
+				_ = world.GetLocationsInRadius("ns", loc["lat"], loc["lon"], 100000)
+			}
+		})
+		b.Run("Should return locations in radius 10km", func(b *testing.B) {
+			world := NewWorld()
+
+			for i := 0; i < b.N; i++ {
+				loc := locs[i%uniqueRecords]
+				id := ids[i%uniqueRecords]
+
+				err := world.Save(id["ns"], id["id"], loc["lat"], loc["lon"])
+				if err != nil {
+					b.Fatalf("Error saving location: %v", err)
+				}
+
+				loc2 := locs[(i+1)%uniqueRecords]
+				id2 := ids[(i+1)%uniqueRecords]
+
+				err = world.Save(id2["ns"], id2["id"], loc2["lat"], loc2["lon"])
+
+				if err != nil {
+					b.Fatalf("Error saving location: %v", err)
+				}
+
+				_ = world.GetLocationsInRadius("ns", loc["lat"], loc["lon"], 10000)
 			}
 		})
 	})

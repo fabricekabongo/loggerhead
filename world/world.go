@@ -171,15 +171,23 @@ func (m *World) GetLocation(ns string, id string) (Location, bool) {
 	return *location, true
 }
 
-func (m *World) GetLocationsInRadius(ns string, lat float64, lon float64, radiusInMeters float64) []map[string]*Location {
+func (m *World) GetLocationsInRadius(ns string, lat float64, lon float64, radiusInMeters float64) []*Location {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		return []map[string]*Location{}
+		return []*Location{}
 	}
 	locationMaps := m.getGridsInRadius(ns, lat, lon, radiusInMeters)
 
-	return locationMaps
+	var locations []*Location
+
+	for _, locationMap := range locationMaps {
+		for _, location := range locationMap {
+			locations = append(locations, location)
+		}
+	}
+
+	return locations
 }
 
 func (m *World) getGridsInRadius(ns string, lat float64, lon float64, radiusInMeters float64) []map[string]*Location {

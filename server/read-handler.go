@@ -64,16 +64,16 @@ func (r *ReadHandler) handleReadConnection(conn net.Conn) {
 	}(conn)
 
 	scanner := bufio.NewScanner(conn) // to listen to new subscription
-	writer := bufio.NewWriter(conn)   // to write events
+	//writer := bufio.NewWriter(conn)   // to write events
 
 	waitGroup := sync.WaitGroup{}
 	defer waitGroup.Wait()
 
-	addSub := make(chan world.LocationAddedEvent)
-	updateSub := make(chan world.LocationUpdateEvent)
-	deleteSub := make(chan world.LocationDeletedEvent)
-
-	go listenToUpdate(addSub, updateSub, deleteSub, writer)
+	//addSub := make(chan world.LocationAddedEvent)
+	//updateSub := make(chan world.LocationUpdateEvent)
+	//deleteSub := make(chan world.LocationDeletedEvent)
+	//
+	//go listenToUpdate(addSub, updateSub, deleteSub, writer)
 
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -117,39 +117,40 @@ func (r *ReadHandler) handleReadConnection(conn net.Conn) {
 	}
 }
 
-func listenToUpdate(addSub chan world.LocationAddedEvent, updateSub chan world.LocationUpdateEvent, deleteSub chan world.LocationDeletedEvent, writer *bufio.Writer) {
-	for {
-		select {
-		case added := <-addSub:
-			data, err := json.Marshal(added)
-			if err != nil {
-				log.Println("Error marshalling added event: ", err)
-				continue
-			}
-			_, err = writer.Write(data)
-			if err != nil {
-				return
-			}
-		case updated := <-updateSub:
-			data, err := json.Marshal(updated)
-			if err != nil {
-				log.Println("Error marshalling updated event: ", err)
-				continue
-			}
-			_, err = writer.Write(data)
-			if err != nil {
-				return
-			}
-		case deleted := <-deleteSub:
-			data, err := json.Marshal(deleted)
-			if err != nil {
-				log.Println("Error marshalling deleted event: ", err)
-				continue
-			}
-			_, err = writer.Write(data)
-			if err != nil {
-				return
-			}
-		}
-	}
-}
+//
+//func listenToUpdate(addSub chan world.LocationAddedEvent, updateSub chan world.LocationUpdateEvent, deleteSub chan world.LocationDeletedEvent, writer *bufio.Writer) {
+//	for {
+//		select {
+//		case added := <-addSub:
+//			data, err := json.Marshal(added)
+//			if err != nil {
+//				log.Println("Error marshalling added event: ", err)
+//				continue
+//			}
+//			_, err = writer.Write(data)
+//			if err != nil {
+//				return
+//			}
+//		case updated := <-updateSub:
+//			data, err := json.Marshal(updated)
+//			if err != nil {
+//				log.Println("Error marshalling updated event: ", err)
+//				continue
+//			}
+//			_, err = writer.Write(data)
+//			if err != nil {
+//				return
+//			}
+//		case deleted := <-deleteSub:
+//			data, err := json.Marshal(deleted)
+//			if err != nil {
+//				log.Println("Error marshalling deleted event: ", err)
+//				continue
+//			}
+//			_, err = writer.Write(data)
+//			if err != nil {
+//				return
+//			}
+//		}
+//	}
+//}

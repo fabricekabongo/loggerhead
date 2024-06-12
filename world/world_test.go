@@ -84,7 +84,7 @@ func TestWorld(t *testing.T) {
 				t.Fatalf("Error saving location: %v", err)
 			}
 
-			locations := world.GetLocationsInRadius("ns", 1.0, 1.0, 500)
+			locations := world.QueryRange("ns", 1.0001, 1.0006, 1.0001, 1.0006)
 
 			if len(locations) != 2 {
 				t.Fatalf("Expected 2 locations to be returned, got %v locations", len(locations))
@@ -101,7 +101,7 @@ func TestWorld(t *testing.T) {
 				t.Fatalf("Error saving location: %v", err)
 			}
 
-			locations := world.GetLocationsInRadius("ns", 35.0, 90.0, 500)
+			locations := world.QueryRange("ns", 80, 90, 30, 40)
 
 			if len(locations) != 0 {
 				t.Fatalf("Expected 0 locations to be returned, got %v locations", len(locations))

@@ -16,14 +16,6 @@ func TestNamespace(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if len(ns.locations) != 1 {
-				t.Errorf("expected 1 location, got %d", len(ns.locations))
-			}
-
-			if ns.locations["id"] != loc {
-				t.Errorf("expected location to be added to the namespace")
-			}
-
 			if loc.Lat != 87 {
 				t.Errorf("expected latitude to be 87, got %f", loc.Lat)
 			}
@@ -39,6 +31,28 @@ func TestNamespace(t *testing.T) {
 			if loc.Id != "id" {
 				t.Errorf("expected location id to be id, got %s", loc.Id)
 			}
+
+			savedLocation, found := ns.GetLocation("id")
+
+			if !found {
+				t.Errorf("expected location to be saved")
+			}
+
+			if savedLocation.Lat != 87 {
+				t.Errorf("expected latitude to be 87, got %f", loc.Lat)
+			}
+
+			if savedLocation.Lon != 125 {
+				t.Errorf("expected longitude to be 125, got %f", loc.Lon)
+			}
+
+			if savedLocation.Ns != "test" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns)
+			}
+
+			if savedLocation.Id != "id" {
+				t.Errorf("expected location id to be id, got %s", loc.Id)
+			}
 		})
 
 		t.Run("should update a location in the namespace if already exist", func(t *testing.T) {
@@ -49,21 +63,31 @@ func TestNamespace(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			loc2, err := ns.SaveLocation("id", 88, 126)
+			_, err = ns.SaveLocation("id", 88, 126)
 			if err != nil {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if len(ns.locations) != 1 {
-				t.Errorf("expected 1 location, got %d", len(ns.locations))
+			savedLocation, found := ns.GetLocation("id")
+
+			if !found {
+				t.Errorf("expected location to be saved")
 			}
 
-			if loc != loc2 {
-				t.Errorf("expect same location pointer to be used")
+			if savedLocation.Lat != 88 {
+				t.Errorf("expected latitude to be 87, got %f", loc.Lat)
 			}
 
-			if loc.Lat != 88 || loc.Lon != 126 {
-				t.Errorf("expected location to be updated")
+			if savedLocation.Lon != 126 {
+				t.Errorf("expected longitude to be 125, got %f", loc.Lon)
+			}
+
+			if savedLocation.Ns != "test" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns)
+			}
+
+			if savedLocation.Id != "id" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns)
 			}
 		})
 	})
@@ -77,8 +101,9 @@ func TestNamespace(t *testing.T) {
 
 			ns.DeleteLocation("id")
 
-			if len(ns.locations) != 0 {
-				t.Errorf("expected 0 location, got %d", len(ns.locations))
+			_, found := ns.GetLocation("id")
+			if found {
+				t.Errorf("expected location to be deleted")
 			}
 		})
 

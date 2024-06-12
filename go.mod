@@ -6,7 +6,6 @@ require (
 	github.com/hashicorp/go-uuid v1.0.3
 	github.com/hashicorp/memberlist v0.5.1
 	github.com/prometheus/client_golang v1.19.1
-	github.com/uber/h3-go v3.0.1+incompatible
 )
 
 require (

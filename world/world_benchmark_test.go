@@ -72,7 +72,7 @@ func BenchmarkWorld(b *testing.B) {
 	})
 
 	b.Run("GetLocationsInRadius", func(b *testing.B) {
-		b.Run("Should return locations in radius 1000km", func(b *testing.B) {
+		b.Run("Should return locations in radius 10km", func(b *testing.B) {
 			world := NewWorld()
 
 			for i := 0; i < b.N; i++ {
@@ -93,7 +93,7 @@ func BenchmarkWorld(b *testing.B) {
 					b.Fatalf("Error saving location: %v", err)
 				}
 
-				_ = world.GetLocationsInRadius("ns", loc["lat"], loc["lon"], 1000000)
+				_ = world.QueryRange(id["ns"], -10, 10, -10, 10)
 			}
 		})
 		b.Run("Should return locations in radius 100km", func(b *testing.B) {
@@ -117,10 +117,10 @@ func BenchmarkWorld(b *testing.B) {
 					b.Fatalf("Error saving location: %v", err)
 				}
 
-				_ = world.GetLocationsInRadius("ns", loc["lat"], loc["lon"], 100000)
+				_ = world.QueryRange(id["ns"], -40, 40, -40, 40)
 			}
 		})
-		b.Run("Should return locations in radius 10km", func(b *testing.B) {
+		b.Run("Should return locations in radius 1000km", func(b *testing.B) {
 			world := NewWorld()
 
 			for i := 0; i < b.N; i++ {
@@ -141,7 +141,7 @@ func BenchmarkWorld(b *testing.B) {
 					b.Fatalf("Error saving location: %v", err)
 				}
 
-				_ = world.GetLocationsInRadius("ns", loc["lat"], loc["lon"], 10000)
+				_ = world.QueryRange(id["ns"], -80, 80, -80, 80)
 			}
 		})
 	})

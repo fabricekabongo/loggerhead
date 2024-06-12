@@ -23,6 +23,11 @@ func NewNamespace(name string) *Namespace {
 	}
 }
 
+func (n *Namespace) Delete(id string) {
+	n.locations.Delete(id)
+	n.tree.Root.Delete(id)
+}
+
 func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location, error) {
 
 	loc, err := NewLocation(n.Name, id, lat, lon)

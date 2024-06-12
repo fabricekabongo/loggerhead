@@ -32,6 +32,16 @@ func NewWorld() *World {
 	}
 }
 
+func (m *World) Delete(ns string, locId string) {
+	namespace := m.getNamespace(ns)
+
+	if namespace == nil {
+		return
+	}
+
+	namespace.Delete(locId)
+}
+
 func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 	namespace := m.getNamespace(ns)
 

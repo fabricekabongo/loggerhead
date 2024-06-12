@@ -22,7 +22,7 @@ jobs:
         go-version: '1.22.1'
 
     - name: Perform the benchmark
-      run: cd world && go test -bench=. -benchmem -benchtime=1m -cpu=1,2,4,8
+      run: cd world && go test -bench=. -benchmem -benchtime=5s -cpu=1,2,4,8
 
   Go_1_22_4:
     runs-on: ubuntu-latest
@@ -35,4 +35,4 @@ jobs:
           go-version: '1.22.4'
 
       - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchmem -benchtime=1m -cpu=1,2,4,8
+        run: cd world && go test -bench=. -benchmem -benchtime=5s -cpu=1,2,4,8

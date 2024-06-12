@@ -29,14 +29,13 @@ func CreateSeedData(records int) ([]map[string]float64, []map[string]string) {
 	return locs, ids
 }
 func BenchmarkWorld(b *testing.B) {
-	uniqueRecords := 10000
+	uniqueRecords := 1000000
 	locs, ids := CreateSeedData(uniqueRecords)
+	world := NewWorld()
+
 	b.Run("Save", func(b *testing.B) {
 		b.Run("Should save a new location", func(b *testing.B) {
-			world := NewWorld()
-
 			for i := 0; i < b.N; i++ {
-
 				loc := locs[i%uniqueRecords]
 				id := ids[i%uniqueRecords]
 
@@ -50,99 +49,38 @@ func BenchmarkWorld(b *testing.B) {
 
 	b.Run("GetLocation", func(b *testing.B) {
 		b.Run("Should return a location", func(b *testing.B) {
-			world := NewWorld()
-
 			for i := 0; i < b.N; i++ {
-				loc := locs[i%uniqueRecords]
 				id := ids[i%uniqueRecords]
-
-				err := world.Save(id["ns"], id["id"], loc["lat"], loc["lon"])
-
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				_, found := world.GetLocation(id["ns"], id["id"])
-
-				if !found {
-					b.Fatalf("Expected location to be returned")
-				}
+				world.GetLocation(id["ns"], id["id"])
 			}
 		})
 	})
 
 	b.Run("GetLocationsInRadius", func(b *testing.B) {
-		b.Run("Should return locations in radius 10km", func(b *testing.B) {
-			world := NewWorld()
-
+		b.Run("Should return locations in the UAE (83.6k km^2)", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				loc := locs[i%uniqueRecords]
-				id := ids[i%uniqueRecords]
-
-				err := world.Save(id["ns"], id["id"], loc["lat"], loc["lon"])
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				loc2 := locs[(i+1)%uniqueRecords]
-				id2 := ids[(i+1)%uniqueRecords]
-
-				err = world.Save(id2["ns"], id2["id"], loc2["lat"], loc2["lon"])
-
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				_ = world.QueryRange(id["ns"], -10, 10, -10, 10)
+				_ = world.QueryRange("ns"+strconv.Itoa(i%10), 22, 26, 51, 56)
 			}
 		})
-		b.Run("Should return locations in radius 100km", func(b *testing.B) {
-			world := NewWorld()
-
+		b.Run("Should return locations in the USA (9.8 m Km^2)", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				loc := locs[i%uniqueRecords]
-				id := ids[i%uniqueRecords]
-
-				err := world.Save(id["ns"], id["id"], loc["lat"], loc["lon"])
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				loc2 := locs[(i+1)%uniqueRecords]
-				id2 := ids[(i+1)%uniqueRecords]
-
-				err = world.Save(id2["ns"], id2["id"], loc2["lat"], loc2["lon"])
-
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				_ = world.QueryRange(id["ns"], -40, 40, -40, 40)
+				_ = world.QueryRange("ns"+strconv.Itoa(i%10), -25, 49, -124, -66)
 			}
 		})
-		b.Run("Should return locations in radius 1000km", func(b *testing.B) {
-			world := NewWorld()
-
+		b.Run("Should return locations in all of africa (30 m Km^2) ", func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
-				loc := locs[i%uniqueRecords]
-				id := ids[i%uniqueRecords]
-
-				err := world.Save(id["ns"], id["id"], loc["lat"], loc["lon"])
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				loc2 := locs[(i+1)%uniqueRecords]
-				id2 := ids[(i+1)%uniqueRecords]
-
-				err = world.Save(id2["ns"], id2["id"], loc2["lat"], loc2["lon"])
-
-				if err != nil {
-					b.Fatalf("Error saving location: %v", err)
-				}
-
-				_ = world.QueryRange(id["ns"], -80, 80, -80, 80)
+				_ = world.QueryRange("ns"+strconv.Itoa(i%10), -34, 37, -17, 51.7)
 			}
 		})
+	})
+
+	b.Run("Delete", func(b *testing.B) {
+		b.Run("Should delete a location", func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				id := ids[i%uniqueRecords]
+				world.Delete(id["ns"], id["id"])
+			}
+		})
+
 	})
 }

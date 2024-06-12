@@ -23,7 +23,7 @@ func NewQuadTree(lat1 float64, lat2 float64, lon1 float64, lon2 float64) *QuadTr
 	return &QuadTree{
 		Root: &TreeNode{
 			IsDivided: false,
-			Capacity:  500,
+			Capacity:  2000,
 			Lat1:      lat1,
 			Lat2:      lat2,
 			Lon1:      lon1,
@@ -54,6 +54,21 @@ func (n *TreeNode) insert(location *Location) bool {
 	}
 
 	return true
+}
+
+func (n *TreeNode) Delete(id string) {
+	if n.IsDivided {
+		n.NE.Delete(id)
+		n.NW.Delete(id)
+		n.SE.Delete(id)
+		n.SW.Delete(id)
+	}
+
+	for i, location := range n.Objects {
+		if location.Id == id {
+			n.Objects = append(n.Objects[:i], n.Objects[i+1:]...)
+		}
+	}
 }
 
 func (n *TreeNode) divide() {
@@ -103,6 +118,9 @@ func (n *TreeNode) divide() {
 	n.IsDivided = true
 }
 
+func (q *QuadTree) reBalance() {
+
+}
 func (n *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 float64) []*Location {
 	var locations []*Location
 

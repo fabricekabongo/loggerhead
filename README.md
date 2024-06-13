@@ -69,3 +69,48 @@ Clustering: 20001
 ===========================================================
 
 ```
+
+# Querying
+
+The database supports the following queries: GET, SAVE, DELETE and POLY (for polygon).
+
+## READ
+You will need to connect to port 19998 to read data from the database.
+
+
+### GET
+```shell
+telnet localhost 19998
+GET mynamespace myid
+
+>> 1.0,mynamespace,myid,12.560000,13.560000
+```
+
+## POLY
+```shell
+telnet localhost 19998
+POLY mynamespace 10.560000 10.560000 15.560000 15.560000
+>> 1.0,mynamespace,myid,12.560000,13.560000
+>> 1.0,mynamespace,myid2,12.560000,11.560000
+>> 1.0,mynamespace,myid3,14.560000,13.560000
+>> 1.0,done
+```
+
+## Writing
+You will need to connect to port 19999 to write data to the database.
+
+## SAVE
+```shell
+telnet localhost 19999
+SAVE mynamespace myid 12.560000 13.560000
+>> 1.0,saved
+```
+
+## DELETE
+```shell
+telnet localhost 19999
+DELETE mynamespace myid
+>> 1.0,deleted
+```
+
+

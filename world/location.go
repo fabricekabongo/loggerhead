@@ -3,6 +3,7 @@ package world
 import (
 	"encoding/gob"
 	"errors"
+	"fmt"
 )
 
 var (
@@ -56,4 +57,8 @@ func (l *Location) validate() error {
 	}
 
 	return nil
+}
+
+func (l *Location) String() string {
+	return fmt.Sprintf("%s,%s,%f,%f", l.Ns, l.Id, l.Lat, l.Lon)
 }

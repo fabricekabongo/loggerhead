@@ -174,6 +174,7 @@ func (n *TreeNode) divide() {
 func (q *QuadTree) reBalance() {
 	// TODO: Implement rebalancing
 }
+
 func (n *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 float64) []*Location {
 	var locations []*Location
 

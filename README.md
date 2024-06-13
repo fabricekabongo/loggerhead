@@ -1,4 +1,4 @@
-# Loggerhead (in progress, query language ready, just need to connect to the database, and review clustering)
+# Loggerhead
 
 # TODO
 - [ ] Connect the query language to the database
@@ -6,6 +6,17 @@
 - [ ] Review the clustering
 - [ ] Improve the usage of prometheus
 - [ ] Implement subscription to polygon's updates
+- [ ] Implement storing and recovering state from disk
+- [ ] Maybe implement consistency of data between nodes
+- [ ] Maybe implement load balancing and sharding
+- [X] Implement the memory storage using a quadtree
+- [X] Implement Benchmark for the storage
+- [X] Implement the network interface
+- [X] Implement the query language
+- [X] Implement the clustering
+- [X] Implement the prometheus metrics
+- [X] Implement the admin interface
+- [X] Implement the gossip protocol
 
 Loggerhead is geolocation database built in go. It is designed to be fast and efficient, and to be used in a distributed
 like kubernetes.

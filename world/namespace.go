@@ -36,7 +36,10 @@ func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location
 	}
 
 	n.locations.Store(id, loc)
-	n.tree.Insert(loc)
+	err = n.tree.Insert(loc)
+	if err != nil {
+		return nil, err
+	}
 
 	return loc, nil
 }

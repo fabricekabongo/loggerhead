@@ -56,7 +56,10 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 	}
 
 	namespace.locations.Store(locId, location)
-	namespace.tree.Insert(location)
+	err = namespace.tree.Insert(location)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

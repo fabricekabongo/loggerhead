@@ -1,19 +1,31 @@
 package world
 
+import (
+	"errors"
+	"strconv"
+	"sync"
+	"sync/atomic"
+)
+
+var (
+	TreeErrLocationNil         = errors.New("insertion failed because location is nil")
+	TreeErrLocationOutOfBounds = errors.New("insertion failed because location is out of bounds")
+)
+
 type QuadTree struct {
 	Root *TreeNode
 }
 
 type TreeNode struct {
-	NE   *TreeNode
-	NW   *TreeNode
-	SE   *TreeNode
-	SW   *TreeNode
-	Lat1 float64
-	Lat2 float64
-	Lon1 float64
-	Lon2 float64
-
+	NE        *TreeNode
+	NW        *TreeNode
+	SE        *TreeNode
+	SW        *TreeNode
+	Lat1      float64
+	Lat2      float64
+	Lon1      float64
+	Lon2      float64
+	mu        sync.RWMutex
 	Objects   []*Location
 	Capacity  int
 	IsDivided bool
@@ -32,28 +44,92 @@ func NewQuadTree(lat1 float64, lat2 float64, lon1 float64, lon2 float64) *QuadTr
 	}
 }
 
-func (q *QuadTree) Insert(location *Location) {
-	q.Root.insert(location)
+func (q *QuadTree) Insert(location *Location) error {
+	if location == nil {
+		return TreeErrLocationNil
+	}
+	return q.Root.insert(location)
 }
 
-func (n *TreeNode) insert(location *Location) bool {
+func NewTreeNode(lat1 float64, lat2 float64, lon1 float64, lon2 float64, capacity int) *TreeNode {
+	return &TreeNode{
+		IsDivided: false,
+		Capacity:  capacity,
+		Lat1:      lat1,
+		Lat2:      lat2,
+		Lon1:      lon1,
+		Lon2:      lon2,
+		Objects:   []*Location{},
+	}
+}
+
+func (n *TreeNode) insert(location *Location) error {
+	if location == nil {
+		return TreeErrLocationNil
+	}
 	// If the location is not within the bound, return
 	if !(n.Lon1 < location.Lon && n.Lon2 > location.Lon && n.Lat1 < location.Lat && n.Lat2 > location.Lat) {
-		return false
+		return TreeErrLocationOutOfBounds
 	}
 
 	if n.IsDivided {
-		if n.NE.insert(location) || n.NW.insert(location) || n.SE.insert(location) || n.SW.insert(location) {
-			return true
-		}
+		n.insertIntoChildren(location)
 	}
-
+	n.mu.Lock()
 	n.Objects = append(n.Objects, location)
+	n.mu.Unlock()
+
 	if len(n.Objects) > n.Capacity {
 		n.divide()
 	}
 
-	return true
+	return nil
+}
+
+func (n *TreeNode) insertIntoChildren(location *Location) {
+	if location == nil {
+		panic("Location is nil. It should never reach this point")
+	}
+	wg := sync.WaitGroup{}
+	wg.Add(4)
+	passedCount := atomic.Int32{}
+
+	go func() {
+		defer wg.Done()
+		err := n.NE.insert(location)
+		if err == nil {
+			passedCount.Add(1)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := n.NW.insert(location)
+		if err == nil {
+			passedCount.Add(1)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := n.SE.insert(location)
+		if err == nil {
+			passedCount.Add(1)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		err := n.SW.insert(location)
+		if err == nil {
+			passedCount.Add(1)
+		}
+	}()
+
+	wg.Wait()
+	if passedCount.Load() != 1 {
+		panic("Location should have been inserted into one of the nodes. Number of nodes inserted: " + string(passedCount.Load()))
+	}
 }
 
 func (n *TreeNode) Delete(id string) {
@@ -64,62 +140,39 @@ func (n *TreeNode) Delete(id string) {
 		n.SW.Delete(id)
 	}
 
+	n.mu.Lock()
 	for i, location := range n.Objects {
 		if location.Id == id {
 			n.Objects = append(n.Objects[:i], n.Objects[i+1:]...)
 		}
 	}
+	n.mu.Unlock()
 }
 
 func (n *TreeNode) divide() {
-	n.NE = &TreeNode{
-		IsDivided: false,
-		Capacity:  n.Capacity,
-		Lat1:      n.Lat1,
-		Lat2:      (n.Lat1 + n.Lat2) / 2,
-		Lon1:      n.Lon1,
-		Lon2:      (n.Lon1 + n.Lon2) / 2,
-	}
+	n.NE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
 
-	n.NW = &TreeNode{
-		IsDivided: false,
-		Capacity:  n.Capacity,
-		Lat1:      n.Lat1,
-		Lat2:      (n.Lat1 + n.Lat2) / 2,
-		Lon1:      (n.Lon1 + n.Lon2) / 2,
-		Lon2:      n.Lon2,
-	}
+	n.NW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 
-	n.SE = &TreeNode{
-		IsDivided: false,
-		Capacity:  n.Capacity,
-		Lat1:      (n.Lat1 + n.Lat2) / 2,
-		Lat2:      n.Lat2,
-		Lon1:      n.Lon1,
-		Lon2:      (n.Lon1 + n.Lon2) / 2,
-	}
+	n.SE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
 
-	n.SW = &TreeNode{
-		IsDivided: false,
-		Capacity:  n.Capacity,
-		Lat1:      (n.Lat1 + n.Lat2) / 2,
-		Lat2:      n.Lat2,
-		Lon1:      (n.Lon1 + n.Lon2) / 2,
-		Lon2:      n.Lon2,
-	}
+	n.SW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 
-	for _, location := range n.Objects {
-		if n.NE.insert(location) || n.NW.insert(location) || n.SE.insert(location) || n.SW.insert(location) {
-			continue
+	n.mu.Lock()
+	for i, location := range n.Objects {
+		if location == nil {
+			panic("The Node is holding nil location. weird don't you think?. Location index: " + strconv.Itoa(i))
 		}
+		n.insertIntoChildren(location)
 	}
 
-	n.Objects = nil
+	n.Objects = []*Location{}
 	n.IsDivided = true
+	n.mu.Unlock()
 }
 
 func (q *QuadTree) reBalance() {
-
+	// TODO: Implement rebalancing
 }
 func (n *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 float64) []*Location {
 	var locations []*Location

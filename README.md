@@ -1,14 +1,15 @@
 # Loggerhead
 
 # TODO
-- [ ] Connect the query language to the database
-- [ ] Connect the network interface to the database through the query processor
+
 - [ ] Review the clustering
 - [ ] Improve the usage of prometheus
 - [ ] Implement subscription to polygon's updates
 - [ ] Implement storing and recovering state from disk
 - [ ] Maybe implement consistency of data between nodes
 - [ ] Maybe implement load balancing and sharding
+- [X] Connect the query language to the database
+- [X] Connect the network interface to the database through the query processor
 - [X] Implement the memory storage using a quadtree
 - [X] Implement Benchmark for the storage
 - [X] Implement the network interface

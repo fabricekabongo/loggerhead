@@ -64,3 +64,45 @@ jobs:
 
       - name: Perform the benchmark
         run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=8
+
+
+
+  benchmark-16-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.4'
+
+      - name: Perform the benchmark
+        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=16
+
+
+  benchmark-32-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.4'
+
+      - name: Perform the benchmark
+        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=32
+
+  benchmark-64-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22.4'
+
+      - name: Perform the benchmark
+        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=64

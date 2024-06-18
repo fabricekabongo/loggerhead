@@ -11,10 +11,10 @@ type Server struct {
 	closeChannel chan struct{}
 }
 
-func NewServer(wHandler WriteHandler, rHander ReadHandler) *Server {
+func NewServer(writeHandler WriteHandler, readHandler ReadHandler) *Server {
 	return &Server{
-		WriteHandler: &wHandler,
-		ReadHandler:  &rHander,
+		WriteHandler: &writeHandler,
+		ReadHandler:  &readHandler,
 		closeChannel: make(chan struct{}),
 	}
 }
@@ -31,13 +31,13 @@ func (s *Server) Start() {
 		panic(err)
 	}
 
-	subscriberListener, err := net.Listen("tcp", ":19998")
+	readListener, err := net.Listen("tcp", ":19998")
 	if err != nil {
 		panic(err)
 	}
 
 	go s.WriteHandler.listen(writerListener)
-	go s.ReadHandler.listen(subscriberListener)
+	go s.ReadHandler.listen(readListener)
 
 	fmt.Println("Read and Write operations ready. Enjoy!")
 	<-s.closeChannel

@@ -13,7 +13,7 @@ func TestQuery(t *testing.T) {
 	t.Run("Invalid Query", func(t *testing.T) {
 		t.Run("should return an error if the query is invalid", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := fmt.Sprintf("%s %s %s", strconv.Itoa(int(rand.Int32())), strconv.Itoa(int(rand.Int32())), strconv.Itoa(int(rand.Int32())))
 
@@ -32,7 +32,7 @@ func TestQuery(t *testing.T) {
 				t.Errorf("Error saving location: %v", err)
 			}
 
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "GET ns-id-8 loc-id-9"
 
@@ -45,7 +45,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should return an empty string if the result is empty", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "GET ns-id-8 loc-id-9"
 
@@ -64,7 +64,7 @@ func TestQuery(t *testing.T) {
 				t.Errorf("Error saving location: %v", err)
 			}
 
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "DELETE ns-id-8 loc-id-9"
 
@@ -84,7 +84,7 @@ func TestQuery(t *testing.T) {
 	t.Run("SaveQuery", func(t *testing.T) {
 		t.Run("should save a location to the world", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
@@ -105,7 +105,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should update a location in the world", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
@@ -134,7 +134,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should return an error if the longitude is invalid", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 200.0"
 
@@ -154,7 +154,7 @@ func TestQuery(t *testing.T) {
 		})
 		t.Run("should return an error if the latitude is invalid", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 100 80"
 
@@ -174,7 +174,7 @@ func TestQuery(t *testing.T) {
 		})
 		t.Run("should return an error if location aren't floats", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 ina 90"
 
@@ -196,7 +196,7 @@ func TestQuery(t *testing.T) {
 	t.Run("POLY Query", func(t *testing.T) {
 		t.Run("should return a list of locations", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryProcessor(world)
+			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 			data := queryProcessor.Execute(query)
@@ -228,6 +228,65 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should return an empty string if the result is empty", func(t *testing.T) {
 
+		})
+	})
+
+	t.Run("Is Write Query", func(t *testing.T) {
+		t.Run("should return true if the query is a write query for Save", func(t *testing.T) {
+			world := w.NewWorld()
+			queryProcessor := NewQueryEngine(world)
+
+			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
+
+			if !queryProcessor.IsWriteQuery(query) {
+				t.Errorf("Expected true but got false")
+			}
+		})
+
+		t.Run("should return true if the query is a write query for Delete", func(t *testing.T) {
+			world := w.NewWorld()
+			queryProcessor := NewQueryEngine(world)
+
+			query := "DELETE ns-id-8 loc-id-9"
+
+			if !queryProcessor.IsWriteQuery(query) {
+				t.Errorf("Expected true but got false")
+			}
+		})
+
+		t.Run("should return false if the query is not a write query", func(t *testing.T) {
+			world := w.NewWorld()
+			queryProcessor := NewQueryEngine(world)
+
+			query := "GET ns-id-8 loc-id-9"
+
+			if queryProcessor.IsWriteQuery(query) {
+				t.Errorf("Expected false but got true")
+			}
+		})
+	})
+
+	t.Run("Is Read Query", func(t *testing.T) {
+		t.Run("should return true if the query is a read query for Get", func(t *testing.T) {
+			world := w.NewWorld()
+			queryProcessor := NewQueryEngine(world)
+
+			query := "GET ns-id-8 loc-id-9"
+
+			if !queryProcessor.IsReadQuery(query) {
+				t.Errorf("Expected true but got false")
+			}
+		})
+
+		t.Run("should return false if the query is not a read query", func(t *testing.T) {
+			world := w.NewWorld()
+			queryProcessor := NewQueryEngine(world)
+
+			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
+
+			if queryProcessor.IsReadQuery(query) {
+				t.Errorf("Expected false but got true")
+			}
 		})
 	})
 }

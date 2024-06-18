@@ -2,13 +2,12 @@ package server
 
 import (
 	"bufio"
-	"encoding/json"
-	"github.com/fabricekabongo/loggerhead/clustering"
-	"github.com/fabricekabongo/loggerhead/world"
+	"github.com/fabricekabongo/loggerhead/query"
 	"github.com/hashicorp/memberlist"
 	"log"
 	"net"
 	"sync"
+	"time"
 )
 
 type WriteCommand struct {
@@ -18,16 +17,20 @@ type WriteCommand struct {
 }
 
 type WriteHandler struct {
-	WorldMap   *world.World
-	closeChan  chan struct{}
-	Broadcasts *memberlist.TransmitLimitedQueue
+	QueryEngine   *query.Engine
+	closeChan     chan struct{}
+	Broadcasts    *memberlist.TransmitLimitedQueue
+	MaxConnection int
+	maxEOFWait    time.Duration
 }
 
-func NewWriteHandler(world *world.World, broadcasts *memberlist.TransmitLimitedQueue) *WriteHandler {
+func NewWriteHandler(engine *query.Engine, broadcasts *memberlist.TransmitLimitedQueue, maxConnections int) *WriteHandler {
 	return &WriteHandler{
-		WorldMap:   world,
-		closeChan:  make(chan struct{}),
-		Broadcasts: broadcasts,
+		QueryEngine:   engine,
+		closeChan:     make(chan struct{}),
+		Broadcasts:    broadcasts,
+		MaxConnection: maxConnections,
+		maxEOFWait:    30 * time.Second, // 1 minutes
 	}
 }
 
@@ -35,11 +38,12 @@ func (w *WriteHandler) listen(listener net.Listener) {
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
-			log.Println("Error closing listener: ", err)
+			log.Println("Error closing write listener: ", err)
 		}
 	}(listener)
 
 	waitGroup := sync.WaitGroup{}
+	workLimit := make(chan int, w.MaxConnection)
 
 	defer waitGroup.Wait()
 
@@ -49,18 +53,35 @@ func (w *WriteHandler) listen(listener net.Listener) {
 			return
 		default:
 			conn, err := listener.Accept()
+			if err != nil {
+				log.Println("Error accepting connection: ", err)
+				continue
+			}
 			waitGroup.Add(1)
+			workLimit <- 0
 
 			if err != nil {
 				panic(err)
 			}
 
-			go w.handleWriteConnection(conn)
+			go func(conn net.Conn) {
+				defer func() {
+					<-workLimit
+					waitGroup.Done()
+				}()
+
+				err := w.handleWriteConnection(conn)
+				if err != nil {
+					log.Println("Error handling write connection: ", err)
+					return
+				}
+
+			}(conn)
 		}
 	}
 }
 
-func (w *WriteHandler) handleWriteConnection(conn net.Conn) {
+func (w *WriteHandler) handleWriteConnection(conn net.Conn) error {
 	log.Println("New write connection from: ", conn.RemoteAddr())
 
 	defer func(conn net.Conn) {
@@ -70,34 +91,37 @@ func (w *WriteHandler) handleWriteConnection(conn net.Conn) {
 		}
 	}(conn)
 
+	wait := 1 * time.Second
+
 	scanner := bufio.NewScanner(conn)
-	for scanner.Scan() {
-		line := scanner.Bytes()
-		if len(line) == 0 {
-			break
+
+	for wait <= w.maxEOFWait {
+		for scanner.Scan() {
+			line := scanner.Text()
+			if len(line) == 0 {
+				break
+			}
+			wait = 1 * time.Second // Reset wait time
+
+			response := w.QueryEngine.Execute(line)
+			_, err := conn.Write([]byte(response))
+			if err != nil {
+				log.Println("Error writing to connection: ", err)
+				return err
+			}
 		}
 
-		w.handleWriterCommand(line)
-	}
-}
+		if err := scanner.Err(); err != nil {
+			log.Println("Error reading from connection ", err)
+			return err
+		}
 
-func (w *WriteHandler) handleWriterCommand(line []byte) {
-	var location world.Location
-	err := json.Unmarshal(line, &location)
-
-	go func(location world.Location) {
-		broadcast := clustering.NewLocationBroadcast(location)
-		w.Broadcasts.QueueBroadcast(broadcast)
-	}(location)
-
-	if err != nil {
-		log.Println("Error parsing command: ", err, line)
-		return
+		if scanner.Err() == nil {
+			wait *= 2 // Exponential backoff
+			log.Println("EOF detected. Waiting for ", wait, " before trying again")
+			time.Sleep(wait)
+		}
 	}
 
-	err = w.WorldMap.Save(location.Ns, location.Id, location.Lat, location.Lon)
-	if err != nil {
-		log.Println("Error saving location to map: ", err)
-		return
-	}
+	return nil
 }

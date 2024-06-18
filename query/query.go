@@ -3,6 +3,7 @@ package query
 import (
 	"errors"
 	w "github.com/fabricekabongo/loggerhead/world"
+	"log"
 	"strconv"
 	"strings"
 )
@@ -22,7 +23,7 @@ type Processor interface {
 	CanProcess(query string) bool
 }
 
-func NewQueryProcessor(world *w.World) *Engine {
+func NewQueryEngine(world *w.World) *Engine {
 	return &Engine{
 		World: world,
 		Chain: []Processor{
@@ -34,12 +35,42 @@ func NewQueryProcessor(world *w.World) *Engine {
 	}
 }
 
+func NewReadQueryEngine(world *w.World) *Engine {
+	return &Engine{
+		World: world,
+		Chain: []Processor{
+			&GetQueryProcessor{World: world},
+			&PolyQueryProcessor{World: world},
+		},
+	}
+}
+
+func NewWriteQueryEngine(world *w.World) *Engine {
+	return &Engine{
+		World: world,
+		Chain: []Processor{
+			&SaveQueryProcessor{World: world},
+			&DeleteQueryProcessor{World: world},
+		},
+	}
+}
+
+func (qp *Engine) IsWriteQuery(query string) bool {
+	return strings.HasPrefix(query, "SAVE") || strings.HasPrefix(query, "DELETE")
+}
+
+func (qp *Engine) IsReadQuery(query string) bool {
+	return strings.HasPrefix(query, "GET") || strings.HasPrefix(query, "POLY")
+}
+
 func (qp *Engine) Execute(query string) string {
 	for _, processor := range qp.Chain {
 		if processor.CanProcess(query) {
 			return processor.Execute(query)
 		}
 	}
+
+	log.Println(ErrorInvalidQuery.Error(), query)
 
 	return "1.0," + ErrorInvalidQuery.Error()
 }

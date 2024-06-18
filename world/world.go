@@ -127,6 +127,8 @@ func (m *World) GetLocation(ns string, id string) (Location, bool) {
 	entry, ok := namespace.locations.Load(id)
 	location, ok := entry.(*Location)
 
+	log.Println("Location: ", location, "ns: ", ns, "id: ", id)
+
 	if !ok {
 		return Location{}, false
 	}

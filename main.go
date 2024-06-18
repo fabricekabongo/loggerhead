@@ -6,17 +6,18 @@ import (
 	"fmt"
 	"github.com/fabricekabongo/loggerhead/admin"
 	"github.com/fabricekabongo/loggerhead/clustering"
+	"github.com/fabricekabongo/loggerhead/query"
 	server2 "github.com/fabricekabongo/loggerhead/server"
 	"github.com/fabricekabongo/loggerhead/world"
 	"github.com/hashicorp/memberlist"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"time"
 )
 
 var (
-	clusterDNS                = os.Getenv("CLUSTER_DNS")
 	FailedToJoinCluster       = errors.New("failed to join cluster")
 	FailedToCreateCluster     = errors.New("failed to create cluster")
 	FailedToExtractIPsFromDNS = errors.New("failed to extract IPs from DNS")
@@ -24,17 +25,15 @@ var (
 
 func main() {
 	start := time.Now()
-	populateEnv()
-
-	flag.Parse()
+	clusterDNS, maxConnections := populateEnv()
 
 	worldMap := world.NewWorld()
 
 	mList, broadcasts, err := createClustering(clusterDNS, worldMap)
+
 	if errors.Is(err, FailedToCreateCluster) {
 		log.Fatal("Failed to create cluster: ", err)
 	}
-
 	if errors.Is(err, FailedToJoinCluster) {
 		log.Println("Failed to join cluster: ", err)
 	}
@@ -55,14 +54,18 @@ func main() {
 	fmt.Println("Use the following ports for the following services:")
 	fmt.Println("Writing location update: 19999")
 	fmt.Println("Reading location update: 19998")
+	fmt.Println("Max Concurrent Connections per port (19999 & 19998):", maxConnections)
 	fmt.Println("Admin UI (/) & Metrics(/metrics): 20000")
 	fmt.Println("Clustering: 20001")
 	fmt.Println("===========================================================")
 	opsServer := admin.NewOpsServer(mList, worldMap)
 	go opsServer.Start()
 
-	writer := server2.NewWriteHandler(worldMap, broadcasts)
-	reader := server2.NewReadHandler(worldMap)
+	readEngine := query.NewReadQueryEngine(worldMap)
+	writeEngine := query.NewWriteQueryEngine(worldMap)
+
+	writer := server2.NewWriteHandler(writeEngine, broadcasts, maxConnections)
+	reader := server2.NewReadHandler(readEngine, maxConnections)
 
 	server := server2.NewServer(*writer, *reader)
 
@@ -140,19 +143,48 @@ func getClusterIPs(clusterDNS string) ([]string, error) {
 	return clusterIPs, nil
 }
 
-func populateEnv() {
-	if clusterDNS == "" {
-		log.Println("Please set the following environment variables:")
-		log.Println("CLUSTER_DNS")
-		log.Println("Reverting to flags...")
+func populateEnv() (string, int) {
 
-		flag.StringVar(&clusterDNS, "cluster-dns", "", "Cluster DNS")
-		flag.Parse()
+	envClusterDNS := os.Getenv("CLUSTER_DNS")
+	envMaxConnections := os.Getenv("MAX_CONNECTIONS")
+
+	var flagClusterDNS string
+	var flagMaxConnections int
+
+	var clusterDNS string
+	var maxConnections int
+
+	flag.StringVar(&flagClusterDNS, "cluster-dns", "", "Cluster DNS")
+	flag.IntVar(&flagMaxConnections, "max-connections", 20, "Max connections concurrently per port (eg: 20 read, 20 write). Default: 20. Remember this database is supposed to be called by your backend services not by your consumers. So you shouldn't need too many connections.")
+	flag.Parse()
+
+	if envClusterDNS == "" {
+		clusterDNS = flagClusterDNS
 
 		if clusterDNS == "" {
-			log.Println("No flags set. Please set the following flags:")
-			log.Println("cluster-dns")
-			os.Exit(1)
+			log.Fatalln("No environment variable set for CLUSTER_DNS or flag set for cluster-dns")
 		}
 	}
+
+	if envMaxConnections == "" {
+		if flagMaxConnections < 1 {
+			log.Fatalln("Max connections should be greater than 0")
+		}
+
+		maxConnections = flagMaxConnections
+
+	} else {
+		convMaxConnections, err := strconv.Atoi(envMaxConnections)
+		if err != nil {
+			log.Fatalln("Failed to convert max connections to int")
+		}
+
+		if convMaxConnections < 1 {
+			log.Fatalln("Max connections should be greater than 0")
+		}
+
+		maxConnections = convMaxConnections
+	}
+
+	return clusterDNS, maxConnections
 }

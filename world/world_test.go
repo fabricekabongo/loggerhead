@@ -108,4 +108,40 @@ func TestWorld(t *testing.T) {
 			}
 		})
 	})
+
+	t.Run("Delete", func(t *testing.T) {
+		t.Parallel()
+		t.Run("Should delete a location", func(t *testing.T) {
+			t.Parallel()
+			world := NewWorld()
+
+			err := world.Save("ns", "locId", 1.0, 1.0)
+
+			if err != nil {
+				t.Fatalf("Error saving location: %v", err)
+			}
+
+			world.Delete("ns", "locId")
+
+			_, found := world.GetLocation("ns", "locId")
+
+			if found {
+				t.Fatalf("Expected location to be deleted")
+			}
+		})
+
+		t.Run("Should not panic if location not found", func(t *testing.T) {
+			t.Parallel()
+			world := NewWorld()
+
+			world.Delete("ns", "locId")
+		})
+
+		t.Run("Should not panic if namespace not found", func(t *testing.T) {
+			t.Parallel()
+			world := NewWorld()
+
+			world.Delete("ns", "locId")
+		})
+	})
 }

@@ -143,11 +143,7 @@ func (n *TreeNode) Delete(id string) {
 	n.mu.Lock()
 	for i, location := range n.Objects {
 		if location.Id == id {
-			if i == len(n.Objects)-1 { // If it's the last element
-				n.Objects = n.Objects[:i]
-			} else if i == 0 { // If it's the first element
-				n.Objects = n.Objects[1:]
-			} else {
+			if i >= 0 && i < len(n.Objects) {
 				n.Objects = append(n.Objects[:i], n.Objects[i+1:]...)
 			}
 		}

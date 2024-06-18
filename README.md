@@ -1,13 +1,18 @@
 # Loggerhead
 
-# TODO
+## Path to 0.1.0
 
-- [ ] Review the clustering
-- [ ] Improve the usage of prometheus
-- [ ] Implement subscription to polygon's updates
-- [ ] Implement storing and recovering state from disk
-- [ ] Maybe implement consistency of data between nodes
-- [ ] Maybe implement load balancing and sharding
+### TODO
+
+- [ ] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
+- [ ] Improve the usage of Prometheus. Planned for `0.0.2`
+- [ ] Implement subscription to Polygon's updates. Planned for `0.0.3`
+- [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.4`
+- [ ] Offer the ability to enable RAFT for a cluster instead of just Gossip for consistency between nodes (slower). Planned for `0.1.0`
+- [ ] Offer the ability to shard namespaces by TreeNodes with primary and replication across nodes (basically multiple RAFT running in parallel) `0.2.0`
+- [ ] Implement storing and recovering state from disk. Planned for `0.3.0`
+
+### Done
 - [X] Connect the query language to the database
 - [X] Connect the network interface to the database through the query processor
 - [X] Implement the memory storage using a quadtree
@@ -15,37 +20,37 @@
 - [X] Implement the network interface
 - [X] Implement the query language
 - [X] Implement the clustering
-- [X] Implement the prometheus metrics
+- [X] Implement the Prometheus metrics
 - [X] Implement the admin interface
 - [X] Implement the gossip protocol
 
-Loggerhead is geolocation database built in go. It is designed to be fast and efficient, and to be used in a distributed
-like kubernetes.
+Loggerhead is a geolocation in-memory database built in Go. It is designed to be fast, efficient and to be used in a distributed environment
+like Kubernetes.
 
-It makes use of hashicorp/memberlist to provide a gossip based membership system, and uses a custom protocol to
-synchronize the database between nodes.
+It uses a gossip-based membership system and performs a best-effort synchronization of the nodes.
 
 ## Usage
 
-The database expose multiple ports for different purposes:
+The database exposes multiple ports for different purposes:
 
-- 19998: for read queries.
-- 19999: for write queries.
-- 20000: for metrics(prometheus) and admin interface where you can visualize the state of the cluster
+- 19998: for Reads queries.
+- 19999: for Writes queries.
+- 20000: for HTTP to consume metrics(Prometheus) and the admin interface where you can visualize the state of the cluster
 - 20001: for the gossip protocol to communicate with other nodes
 
 ## Configuration
 
 The database can be configured using environment variables or command line arguments.
-So far only one configuration is supported:
+So far, only two configurations are supported:
 
-- CLUSTER_DNS: the dns name of the cluster, this is used to discover other nodes in the cluster by extracting the
-  ip addresses from the dns name (very convenient for kubernetes).
-- SEED_NODES (coming soon): a list of seed nodes to bootstrap the cluster.
+- `CLUSTER_DNS`: the DNS name of the cluster; this is used to discover other nodes in the cluster by extracting the
+  IP addresses from the DNS record. This is very convenient for Kubernetes; you provide the service DNS, e.g., loggerhead.default.svc.cluster.local, and the database will find the other nodes quickly. If you scale up, the new nodes will join the cluster automatically).
+- `MAX_CONNECTIONS`: This is the number of connections you want to allow per port (each for READ and PORT). You need to find the right balance between too few, which creates congestion on the operations per CPU Core (although it can handle quite a lot), and too many, which risks making the CPU go to 100% and slow the system. The idea here is that the database will be called by your backend services, so there is no need to allow too many connections. If you plan to open many connections, you must modify ulimit in Linux.
+- `SEED_NODES`: (coming soon): a list of seed nodes to bootstrap the cluster.
 
 ## Building
 
-The database require go 1.22.1 and GCC to build.
+The database requires 1.22.1 and GCC to build.
 
 ```shell
 CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o loggerhead
@@ -59,7 +64,7 @@ CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o loggerhead
 
 ```
 
-The output will look like so:
+The output will look like this:
 
 ```
 2024/06/10 01:44:07 Please set the following environment variables:
@@ -91,11 +96,12 @@ Clustering: 20001
 
 # Querying
 
-The database supports the following queries: GET, SAVE, DELETE and POLY (for polygon).
+The database supports the following queries: GET, SAVE, DELETE, and POLY (for polygon).
 
 ## READ
-You will need to connect to port 19998 to read data from the database.
+You must connect to port 19998 to read data from the database.
 
+*Note that the "1.0" at the beginning of each message is the version of the format, should the format change in the future, I want the client to be able to identify that immediately.*
 
 ### GET
 ```shell

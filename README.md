@@ -1,5 +1,4 @@
-![Brimston](https://github.com/fabricekabongo/loggerhead/assets/4486484/7a4eb6c5-7d68-45e9-8bde-2a5b190b4c61)
-
+![Brimston (1)](https://github.com/fabricekabongo/loggerhead/assets/4486484/5d1c7777-ccce-44a5-bc5f-f2e5de23d96f)
 
 # Loggerhead
 

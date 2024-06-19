@@ -1,3 +1,6 @@
+![Brimston](https://github.com/fabricekabongo/loggerhead/assets/4486484/7a4eb6c5-7d68-45e9-8bde-2a5b190b4c61)
+
+
 # Loggerhead
 
 ## Path to 0.1.0

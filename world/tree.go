@@ -4,7 +4,6 @@ import (
 	"errors"
 	"strconv"
 	"sync"
-	"sync/atomic"
 )
 
 var (
@@ -65,16 +64,19 @@ func NewTreeNode(lat1 float64, lat2 float64, lon1 float64, lon2 float64, capacit
 
 func (n *TreeNode) insert(location *Location) error {
 	if location == nil {
-		return TreeErrLocationNil
+		panic("Location is nil. It should never reach this point")
 	}
 	// If the location is not within the bound, return
-	if !(n.Lon1 < location.Lon() && n.Lon2 > location.Lon() && n.Lat1 < location.Lat() && n.Lat2 > location.Lat()) {
+	if !(n.Lon1 <= location.Lon() && location.Lon() < n.Lon2 && n.Lat1 <= location.Lat() && location.Lat() < n.Lat2) {
 		return TreeErrLocationOutOfBounds
 	}
 
 	if n.IsDivided {
 		n.insertIntoChildren(location)
+		return nil
 	}
+
+	// If the node is not divided, insert the location into the node
 	n.mu.Lock()
 	n.Objects = append(n.Objects, location)
 	n.mu.Unlock()
@@ -90,45 +92,25 @@ func (n *TreeNode) insertIntoChildren(location *Location) {
 	if location == nil {
 		panic("Location is nil. It should never reach this point")
 	}
-	wg := sync.WaitGroup{}
-	wg.Add(4)
-	passedCount := atomic.Int32{}
 
-	go func() {
-		defer wg.Done()
-		err := n.NE.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
+	err := n.NW.insert(location)
+	if err == nil {
+		return
+	}
 
-	go func() {
-		defer wg.Done()
-		err := n.NW.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
+	err = n.NE.insert(location)
+	if err == nil {
+		return
+	}
 
-	go func() {
-		defer wg.Done()
-		err := n.SE.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
+	err = n.SW.insert(location)
+	if err == nil {
+		return
+	}
 
-	go func() {
-		defer wg.Done()
-		err := n.SW.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
-
-	wg.Wait()
-	if passedCount.Load() != 1 {
-		panic("Location should have been inserted into one of the nodes. Number of nodes inserted: " + strconv.Itoa(int(passedCount.Load())))
+	err = n.SE.insert(location)
+	if err == nil {
+		return
 	}
 }
 
@@ -138,6 +120,7 @@ func (n *TreeNode) Delete(id string) {
 		n.NW.Delete(id)
 		n.SE.Delete(id)
 		n.SW.Delete(id)
+		return
 	}
 
 	n.mu.Lock()
@@ -153,11 +136,8 @@ func (n *TreeNode) Delete(id string) {
 
 func (n *TreeNode) divide() {
 	n.NE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-
 	n.NW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
-
 	n.SE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-
 	n.SW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 
 	n.mu.Lock()

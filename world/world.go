@@ -42,6 +42,7 @@ func (m *World) Delete(ns string, locId string) {
 	namespace.Delete(locId)
 }
 
+// Save a location to the world. If the location already exists, it will be updated.
 func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 	namespace := m.getNamespace(ns)
 
@@ -49,13 +50,31 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 		return NamespaceErrorNotFound
 	}
 
-	location, err := NewLocation(ns, locId, lat, lon)
+	var location *Location
+	err := error(nil)
 
-	if err != nil {
-		return err
+	storedData, ok := namespace.locations.Load(locId)
+
+	if ok {
+		location, ok = storedData.(*Location)
+		if !ok {
+			return errors.New("location not found")
+		}
+
+		err := location.Update(lat, lon)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	} else {
+		location, err = NewLocation(ns, locId, lat, lon)
+		if err != nil {
+			return err
+		}
+		namespace.locations.Store(locId, location)
 	}
 
-	namespace.locations.Store(locId, location)
 	err = namespace.tree.Insert(location)
 	if err != nil {
 		return err

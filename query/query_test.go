@@ -204,7 +204,7 @@ func TestQuery(t *testing.T) {
 				t.Errorf("expected \"1.0,saved\" got %v", data)
 			}
 
-			query = "SAVE ns-id-8 loc-id-9 1.5 2.0"
+			query = "SAVE ns-id-8 loc-id-10 1.5 2.0"
 			data = queryProcessor.Execute(query)
 			if data != "1.0,saved" {
 				t.Errorf("expected \"1.0,saved\" got %v", data)
@@ -217,7 +217,7 @@ func TestQuery(t *testing.T) {
 			stringBuilder := strings.Builder{}
 			stringBuilder.WriteString("1.0,ns-id-8,loc-id-9,1.000000,2.000000")
 			stringBuilder.WriteString("\n")
-			stringBuilder.WriteString("1.0,ns-id-8,loc-id-9,1.500000,2.000000")
+			stringBuilder.WriteString("1.0,ns-id-8,loc-id-10,1.500000,2.000000")
 			stringBuilder.WriteString("\n")
 			stringBuilder.WriteString("1.0,done")
 
@@ -227,7 +227,16 @@ func TestQuery(t *testing.T) {
 		})
 
 		t.Run("should return an empty string if the result is empty", func(t *testing.T) {
+			world := w.NewWorld()
+			queryProcessor := NewQueryEngine(world)
 
+			query := "POLY ns-id-8 0 0 2 2" // lat1 lon1 lat2 lon2
+
+			data := queryProcessor.Execute(query)
+
+			if data != "1.0,done" {
+				t.Errorf("Expected '1.0,' but got %v", data)
+			}
 		})
 	})
 

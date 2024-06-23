@@ -24,7 +24,7 @@ func NewLocationBroadcast(location world.Location) *LocationBroadcast {
 	}
 
 	return &LocationBroadcast{
-		locId:  location.Id,
+		locId:  location.Id(),
 		msg:    msg.Bytes(),
 		notify: make(chan struct{}),
 	}

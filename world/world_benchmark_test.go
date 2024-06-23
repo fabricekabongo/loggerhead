@@ -30,7 +30,7 @@ func BenchmarkWorldParallel(b *testing.B) {
 						b.Fatalf("Error creating  random location: %v", err)
 					}
 
-					err = world.Save(location.Ns, location.Id, location.Lat, location.Lon)
+					err = world.Save(location.Ns(), location.Id(), location.Lat(), location.Lon())
 					if err != nil {
 						b.Fatalf("Error saving location: %v", err)
 					}
@@ -118,7 +118,7 @@ func BenchmarkWorld(b *testing.B) {
 					b.Fatalf("Error creating  random location: %v", err)
 				}
 
-				err = world.Save(location.Ns, location.Id, location.Lat, location.Lon)
+				err = world.Save(location.Ns(), location.Id(), location.Lat(), location.Lon())
 				if err != nil {
 					b.Fatalf("Error saving location: %v", err)
 				}

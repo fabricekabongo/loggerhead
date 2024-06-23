@@ -16,20 +16,20 @@ func TestNamespace(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if loc.Lat != 87 {
-				t.Errorf("expected latitude to be 87, got %f", loc.Lat)
+			if loc.Lat() != 87 {
+				t.Errorf("expected latitude to be 87, got %f", loc.Lat())
 			}
 
-			if loc.Lon != 125 {
-				t.Errorf("expected longitude to be 125, got %f", loc.Lon)
+			if loc.Lon() != 125 {
+				t.Errorf("expected longitude to be 125, got %f", loc.Lon())
 			}
 
-			if loc.Ns != "test" {
-				t.Errorf("expected namespace to be test, got %s", loc.Ns)
+			if loc.Ns() != "test" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns())
 			}
 
-			if loc.Id != "id" {
-				t.Errorf("expected location id to be id, got %s", loc.Id)
+			if loc.Id() != "id" {
+				t.Errorf("expected location id to be id, got %s", loc.Id())
 			}
 
 			savedLocation, found := ns.GetLocation("id")
@@ -38,20 +38,20 @@ func TestNamespace(t *testing.T) {
 				t.Errorf("expected location to be saved")
 			}
 
-			if savedLocation.Lat != 87 {
-				t.Errorf("expected latitude to be 87, got %f", loc.Lat)
+			if savedLocation.Lat() != 87 {
+				t.Errorf("expected latitude to be 87, got %f", loc.Lat())
 			}
 
-			if savedLocation.Lon != 125 {
-				t.Errorf("expected longitude to be 125, got %f", loc.Lon)
+			if savedLocation.Lon() != 125 {
+				t.Errorf("expected longitude to be 125, got %f", loc.Lon())
 			}
 
-			if savedLocation.Ns != "test" {
-				t.Errorf("expected namespace to be test, got %s", loc.Ns)
+			if savedLocation.Ns() != "test" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns())
 			}
 
-			if savedLocation.Id != "id" {
-				t.Errorf("expected location id to be id, got %s", loc.Id)
+			if savedLocation.Id() != "id" {
+				t.Errorf("expected location id to be id, got %s", loc.Id())
 			}
 		})
 
@@ -74,20 +74,20 @@ func TestNamespace(t *testing.T) {
 				t.Errorf("expected location to be saved")
 			}
 
-			if savedLocation.Lat != 88 {
-				t.Errorf("expected latitude to be 87, got %f", loc.Lat)
+			if savedLocation.Lat() != 88 {
+				t.Errorf("expected latitude to be 87, got %f", loc.Lat())
 			}
 
-			if savedLocation.Lon != 126 {
-				t.Errorf("expected longitude to be 125, got %f", loc.Lon)
+			if savedLocation.Lon() != 126 {
+				t.Errorf("expected longitude to be 125, got %f", loc.Lon())
 			}
 
-			if savedLocation.Ns != "test" {
-				t.Errorf("expected namespace to be test, got %s", loc.Ns)
+			if savedLocation.Ns() != "test" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns())
 			}
 
-			if savedLocation.Id != "id" {
-				t.Errorf("expected namespace to be test, got %s", loc.Ns)
+			if savedLocation.Id() != "id" {
+				t.Errorf("expected namespace to be test, got %s", loc.Ns())
 			}
 		})
 	})

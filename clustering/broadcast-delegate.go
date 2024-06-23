@@ -80,7 +80,7 @@ func (d *BroadcastDelegate) NotifyMsg(buf []byte) {
 			return
 		}
 
-		err = d.state.World.Save(location.Ns, location.Id, location.Lat, location.Lon)
+		err = d.state.World.Save(location.Ns(), location.Id(), location.Lat(), location.Lon())
 		if err != nil {
 			return
 		}

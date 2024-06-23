@@ -9,12 +9,12 @@ func TestTree(t *testing.T) {
 		t.Run("Should delete a location", func(t *testing.T) {
 			t.Parallel()
 			tree := NewQuadTree(-90, 90, -180, 180)
+			loc, err := NewLocation("ns", "locId", 1.0, 1.0)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
 
-			err := tree.Insert(&Location{
-				Lat: 1.0,
-				Lon: 1.0,
-				Id:  "locId",
-			})
+			err = tree.Insert(loc)
 			if err != nil {
 				t.Fatalf("Error inserting location: %v", err)
 			}

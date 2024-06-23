@@ -68,7 +68,7 @@ func (n *TreeNode) insert(location *Location) error {
 		return TreeErrLocationNil
 	}
 	// If the location is not within the bound, return
-	if !(n.Lon1 < location.Lon && n.Lon2 > location.Lon && n.Lat1 < location.Lat && n.Lat2 > location.Lat) {
+	if !(n.Lon1 < location.Lon() && n.Lon2 > location.Lon() && n.Lat1 < location.Lat() && n.Lat2 > location.Lat()) {
 		return TreeErrLocationOutOfBounds
 	}
 
@@ -142,7 +142,7 @@ func (n *TreeNode) Delete(id string) {
 
 	n.mu.Lock()
 	for i, location := range n.Objects {
-		if location.Id == id {
+		if location.Id() == id {
 			if i >= 0 && i < len(n.Objects) {
 				n.Objects = append(n.Objects[:i], n.Objects[i+1:]...)
 			}
@@ -194,7 +194,7 @@ func (n *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 flo
 	}
 
 	for _, location := range n.Objects {
-		if location.Lon >= lon1 && location.Lon <= lon2 && location.Lat >= lat1 && location.Lat <= lat2 {
+		if location.Lon() >= lon1 && location.Lon() <= lon2 && location.Lat() >= lat1 && location.Lat() <= lat2 {
 			locations = append(locations, location)
 		}
 	}

@@ -23,7 +23,7 @@ func TestWorld(t *testing.T) {
 				t.Fatalf("Expected location to be saved")
 			}
 
-			if loc.Lat != 1.0 || loc.Lon != 1.0 || loc.Id != "locId" || loc.Ns != "ns" {
+			if loc.Lat() != 1.0 || loc.Lon() != 1.0 || loc.Id() != "locId" || loc.Ns() != "ns" {
 				t.Fatalf("Expected location to be saved")
 			}
 		})
@@ -48,7 +48,7 @@ func TestWorld(t *testing.T) {
 				t.Fatalf("Expected location to be updated")
 			}
 
-			if loc.Lat != 2.0 || loc.Lon != 2.0 || loc.Id != "locId" || loc.Ns != "ns" {
+			if loc.Lat() != 2.0 || loc.Lon() != 2.0 || loc.Id() != "locId" || loc.Ns() != "ns" {
 				t.Fatalf("Expected location to be updated")
 			}
 		})

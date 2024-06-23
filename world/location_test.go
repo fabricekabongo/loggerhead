@@ -89,16 +89,16 @@ func TestLocation(t *testing.T) {
 				t.Errorf("unexpected error: %v", err)
 			}
 
-			if loc.Id != id {
-				t.Errorf("expected loc id to be %s, got %s", id, loc.Id)
+			if loc.Id() != id {
+				t.Errorf("expected loc id to be %s, got %s", id, loc.Id())
 			}
 
-			if loc.Lat != lat {
-				t.Errorf("expected lat to be %f, got %f", lat, loc.Lat)
+			if loc.Lat() != lat {
+				t.Errorf("expected lat to be %f, got %f", lat, loc.Lat())
 			}
 
-			if loc.Lon != lon {
-				t.Errorf("expected lon to be %f, got %f", lon, loc.Lon)
+			if loc.Lon() != lon {
+				t.Errorf("expected lon to be %f, got %f", lon, loc.Lon())
 			}
 		})
 	})

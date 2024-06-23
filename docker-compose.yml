@@ -1,7 +1,18 @@
 services:
-    loggerhead:
+    seed:
         build:
             context: .
+        ports:
+            - "20000:20000"
 
+    others:
+        build:
+            context: .
         environment:
-        - CLUSTER_DNS=loggerhead
+            - SEED_NODE=seed
+        ports:
+            - "30000:20000"
+
+networks:
+    default:
+        driver: bridge

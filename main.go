@@ -25,11 +25,11 @@ var (
 
 func main() {
 	start := time.Now()
-	clusterDNS, maxConnections := populateEnv()
+	clusterDNS, maxConnections, seedNode := populateEnv()
 
 	worldMap := world.NewWorld()
 
-	mList, broadcasts, err := createClustering(clusterDNS, worldMap)
+	mList, broadcasts, err := createClustering(clusterDNS, worldMap, seedNode)
 
 	if errors.Is(err, FailedToCreateCluster) {
 		log.Fatal("Failed to create cluster: ", err)
@@ -57,6 +57,7 @@ func main() {
 	fmt.Println("Max Concurrent Connections per port (19999 & 19998):", maxConnections)
 	fmt.Println("Admin UI (/) & Metrics(/metrics): 20000")
 	fmt.Println("Clustering: 20001")
+	fmt.Println("My IP is: ", mList.LocalNode().Addr.String())
 	fmt.Println("===========================================================")
 	opsServer := admin.NewOpsServer(mList, worldMap)
 	go opsServer.Start()
@@ -76,7 +77,7 @@ func main() {
 	server.Start()
 }
 
-func createClustering(clusterDNS string, world *world.World) (*memberlist.Memberlist, *memberlist.TransmitLimitedQueue, error) {
+func createClustering(clusterDNS string, world *world.World, seedNode string) (*memberlist.Memberlist, *memberlist.TransmitLimitedQueue, error) {
 	broadcasts := &memberlist.TransmitLimitedQueue{
 		NumNodes: func() int {
 			return 1 // Replace with the actual number of nodes
@@ -106,11 +107,19 @@ func createClustering(clusterDNS string, world *world.World) (*memberlist.Member
 	broadcasts.NumNodes = func() int {
 		return mList.NumMembers()
 	}
+	var clusterIPs []string
 
-	clusterIPs, err := getClusterIPs(clusterDNS)
-	if err != nil {
-		log.Println("Failed to get cluster IPs: ", err)
-		return nil, nil, FailedToExtractIPsFromDNS
+	if seedNode != "" {
+		clusterIPs = []string{seedNode}
+	} else {
+		clusterIPs, err = getClusterIPs(clusterDNS)
+		if err != nil {
+			log.Println("Failed to get cluster IPs: ", err)
+			log.Println("Cluster DNS: ", clusterDNS)
+			log.Println("I assume I am the seed node. I will work alone until the other nodes join me.")
+
+			return mList, broadcasts, nil
+		}
 	}
 
 	_, err = mList.Join(clusterIPs)
@@ -143,18 +152,22 @@ func getClusterIPs(clusterDNS string) ([]string, error) {
 	return clusterIPs, nil
 }
 
-func populateEnv() (string, int) {
+func populateEnv() (string, int, string) {
 
 	envClusterDNS := os.Getenv("CLUSTER_DNS")
 	envMaxConnections := os.Getenv("MAX_CONNECTIONS")
+	envSeedNode := os.Getenv("SEED_NODE")
 
 	var flagClusterDNS string
 	var flagMaxConnections int
+	var flagSeedNode string
 
 	var clusterDNS string
+	var seedNode string
 	var maxConnections int
 
 	flag.StringVar(&flagClusterDNS, "cluster-dns", "", "Cluster DNS")
+	flag.StringVar(&flagSeedNode, "seed-node", "", "Seed Node IP Address")
 	flag.IntVar(&flagMaxConnections, "max-connections", 20, "Max connections concurrently per port (eg: 20 read, 20 write). Default: 20. Remember this database is supposed to be called by your backend services not by your consumers. So you shouldn't need too many connections.")
 	flag.Parse()
 
@@ -162,8 +175,20 @@ func populateEnv() (string, int) {
 		clusterDNS = flagClusterDNS
 
 		if clusterDNS == "" {
-			log.Fatalln("No environment variable set for CLUSTER_DNS or flag set for cluster-dns")
+			log.Println("No environment variable set for CLUSTER_DNS or flag set for cluster-dns")
 		}
+	} else {
+		clusterDNS = envClusterDNS
+	}
+
+	if envSeedNode == "" {
+		seedNode = flagSeedNode
+
+		if seedNode == "" {
+			log.Println("No environment variable set for SEED_NODE or flag set for seed-node")
+		}
+	} else {
+		seedNode = envSeedNode
 	}
 
 	if envMaxConnections == "" {
@@ -186,5 +211,5 @@ func populateEnv() (string, int) {
 		maxConnections = convMaxConnections
 	}
 
-	return clusterDNS, maxConnections
+	return clusterDNS, maxConnections, seedNode
 }

@@ -77,7 +77,7 @@ func (r *ReadHandler) handleReadConnection(conn net.Conn) {
 			return
 		}
 
-		command := string(line)
+		command := line
 		response := r.QueryEngine.Execute(command)
 		_, err := conn.Write([]byte(response + "\n"))
 		if err != nil {

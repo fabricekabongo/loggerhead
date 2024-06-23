@@ -9,6 +9,7 @@ import (
 	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"html/template"
+	"log"
 	"net/http"
 )
 
@@ -45,6 +46,7 @@ func (o *OpsServer) Start() {
 	http.Handle("/", o.AdminUI())
 	err := http.ListenAndServe(":20000", nil)
 	if err != nil {
+		log.Println("Failed to start the admin server: ", err)
 		return
 	}
 

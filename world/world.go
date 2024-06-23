@@ -132,7 +132,6 @@ func (m *World) Merge(w *World) {
 	w.namespaces.Range(func(key, ns interface{}) bool {
 		m.namespaces.Store(key, ns)
 		return true
-
 	})
 }
 

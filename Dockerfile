@@ -71,5 +71,16 @@ USER appuser
 # Copy the executable from the "build" stage.
 COPY --from=build /bin/server /bin/
 
+# Document the port the service listens on.
+
+# TCP for Read
+EXPOSE 19998
+# TCP for Write
+EXPOSE 19999
+# HTTP for admin and metrics
+EXPOSE 20000
+# UDP for gossip and clustering
+EXPOSE 20001
+
 # What the container should run when it is started.
 ENTRYPOINT [ "/bin/server" ]

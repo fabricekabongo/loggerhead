@@ -128,7 +128,7 @@ func (n *TreeNode) insertIntoChildren(location *Location) {
 
 	wg.Wait()
 	if passedCount.Load() != 1 {
-		panic("Location should have been inserted into one of the nodes. Number of nodes inserted: " + string(passedCount.Load()))
+		panic("Location should have been inserted into one of the nodes. Number of nodes inserted: " + strconv.Itoa(int(passedCount.Load())))
 	}
 }
 

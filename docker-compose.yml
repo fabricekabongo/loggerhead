@@ -6,6 +6,8 @@ services:
             - "20000:20000"
 
     others:
+        depends_on:
+            -   seed
         build:
             context: .
         environment:

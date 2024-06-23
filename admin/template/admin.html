@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>LoggerHead Admin</title>
-    <link rel="stylesheet" href="/static/static/bootstrap/css/bootstrap.css">
+    <link rel="stylesheet" href="/static/static/css/bootstrap.css">
 </head>
 <body>
     <h1>Welcome to LoggerHead Admin interface</h1>
@@ -11,36 +11,65 @@
     <div class="container">
         <div class="row">
             <h2>Cluster:</h2>
-            {{range $member := .Members}}
-            <div class="col-3 mt-3">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="card-title">
-                            {{$member.Name}}
-                        </div>
-                        <div class="card-text">
-                            <ul>
-                                <li>Address: {{$member.Addr}}</li>
-                                <li>Status: {{$member.State}}</li>
-                                <li>Stored Locations: {{$member.Meta.Locations}}</li>
-                                <li>Instantiated Grids: {{$member.Meta.Grids}}</li>
-                                <li>Memory:
-                                    <ul>
-                                        <li>Memory Usage (Alloc): {{$member.Meta.MemStats.Alloc}} Mb</li>
-                                        <li>Total Used Memory (TotalAlloc): {{$member.Meta.MemStats.Alloc}} Mb</li>
-                                        <li>Reserved Memory (Sys): {{$member.Meta.MemStats.Sys}} Mb</li>
-                                    </ul>
-                                </li>
-                                <li>Usable CPUs: {{$member.Meta.CPUs}}</li>
-                                <li>GoRoutine Running: {{$member.Meta.GoRoutines}}</li>
-                            </ul>
-                        </div>
-                    </div>
+            <span class="data-placeholder">Loading cluster state.....</span>
+            <div class="row">
+                <div class="col-12">
+                    <table class="table table-stripped d-none" id="data-table">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>
+                                Perceived Health
+                            </th>
+                            <th>
+                                State
+                            </th>
+                            <th>
+                                Nodes Known Alive
+                            <th>
+                                Memory
+                            </th>
+                            <th>
+                                Available CPUs
+                            </th>
+                            <th>
+                                Go Routines
+                            </th>
+                        </tr>
+                        </thead>
+                        <tbody ></tbody>
+
+                        <tfoot>
+                        <tr>
+                            <th>Name</th>
+                            <th>
+                                Perceived Health
+                            </th>
+                            <th>
+                                State
+                            </th>
+                            <th>
+                                Nodes Known Alive
+                            <th>
+                                Memory
+                            </th>
+                            <th>
+                                Available CPUs
+                            </th>
+                            <th>
+                                Go Routines
+                            </th>
+                        </tr>
+                        </tfoot>
+
+                    </table>
                 </div>
             </div>
-            {{end}}
         </div>
     </div>
-    <script src="/static/static/bootstrap/js/bootstrap.js"></script>
+    <script src="/static/static/js/jquery-v3.7.1.min.js"></script>
+    <script src="/static/static/js/bootstrap.js"></script>
+    <script src="/static/static/js/admin.js"></script>
+
 </body>
 </html>

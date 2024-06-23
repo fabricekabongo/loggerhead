@@ -23,8 +23,8 @@ type NodeState struct {
 }
 
 type NodeMetaData struct {
-	Locations  int
-	Grids      int
+	Locations  int `json:"locations"`
+	Grids      int `json:"grids"`
 	MemStats   MemStats
 	CPUs       int
 	GoRoutines int

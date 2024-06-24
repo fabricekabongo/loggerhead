@@ -39,11 +39,13 @@ func main() {
 		}
 	}(cluster)
 
+	clusterEngine := clustering.NewEngineDecorator(cluster, writeEngine)
+
 	opsServer := admin.NewOpsServer(cluster, cfg)
 	go opsServer.Start()
 
-	writer := server.NewListener(cfg.WritePort, cfg.MaxConnections, cfg.MaxEOFWait, writeEngine)
-	reader := server.NewListener(cfg.ReadPort, cfg.MaxConnections, cfg.MaxEOFWait, readEngine)
+	writer := server.NewListener(cfg.WritePort, cfg.MaxConnections, cfg.MaxEOFWait, clusterEngine) // This is the writer listener (for writes and broadcasts)
+	reader := server.NewListener(cfg.ReadPort, cfg.MaxConnections, cfg.MaxEOFWait, readEngine)     // This is the reader listener (for reads).
 	// subscriber := server.NewListener(cfg, subscriberEngine)
 
 	svr := server.NewServer([]*server.Listener{writer, reader})

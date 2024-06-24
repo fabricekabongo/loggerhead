@@ -1,45 +1,24 @@
 package clustering
 
 import (
-	"bytes"
-	"encoding/gob"
-	"github.com/fabricekabongo/loggerhead/world"
 	"github.com/hashicorp/memberlist"
 )
 
 type LocationBroadcast struct {
-	locId  string
-	msg    []byte
-	notify chan<- struct{}
+	command string
+	msg     []byte
+	notify  chan<- struct{}
 }
 
-func NewLocationBroadcast(location world.Location) *LocationBroadcast {
-	var msg bytes.Buffer
-
-	enc := gob.NewEncoder(&msg)
-	err := enc.Encode(location)
-
-	if err != nil {
-		return nil
-	}
-
+func NewLocationBroadcast(command string) *LocationBroadcast {
 	return &LocationBroadcast{
-		locId:  location.Id(),
-		msg:    msg.Bytes(),
-		notify: make(chan struct{}),
+		command: command,
+		msg:     []byte(command),
 	}
 }
 
 func (b *LocationBroadcast) Invalidates(old memberlist.Broadcast) bool {
-	if old == nil {
-		return true
-	}
-
-	if old.(*LocationBroadcast).locId == b.locId {
-		return true
-	}
-
-	return false
+	return b.command == old.(*LocationBroadcast).command // Prevents duplicate messages but breaks the message ordering
 }
 
 func (b *LocationBroadcast) Message() []byte {

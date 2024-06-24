@@ -85,7 +85,7 @@ func createClustering(clusterDNS string, world *world.World, seedNode string) (*
 		RetransmitMult: 3,
 	}
 
-	delegate := clustering.NewBroadcastDelegate(world, broadcasts)
+	delegate := clustering.NewBroadcastDelegate(query.NewWriteQueryEngine(world), broadcasts)
 
 	hostname, err := os.Hostname()
 	if err != nil {

@@ -4,6 +4,8 @@ services:
             context: .
         ports:
             - "20000:20000"
+            - "19999:19999"
+            - "19998:19998"
 
     others:
         depends_on:
@@ -14,6 +16,8 @@ services:
             - SEED_NODE=seed
         ports:
             - "30000:20000"
+            - "39999:19999"
+            - "39998:19998"
 
 networks:
     default:

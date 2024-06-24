@@ -2,32 +2,40 @@ package server
 
 import (
 	"bufio"
+	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/fabricekabongo/loggerhead/query"
-	"github.com/hashicorp/memberlist"
 	"log"
 	"net"
 	"time"
 )
 
-type WriteHandler struct {
-	QueryEngine   *query.Engine
-	closeChan     chan struct{}
-	Broadcasts    *memberlist.TransmitLimitedQueue
-	MaxConnection int
-	maxEOFWait    time.Duration
+type Handler struct {
+	QueryEngine    query.EngineInterface
+	closeChan      chan int
+	MaxConnections int
+	maxEOFWait     time.Duration
 }
 
-func NewWriteHandler(engine *query.Engine, broadcasts *memberlist.TransmitLimitedQueue, maxConnections int) *WriteHandler {
-	return &WriteHandler{
-		QueryEngine:   engine,
-		closeChan:     make(chan struct{}),
-		Broadcasts:    broadcasts,
-		MaxConnection: maxConnections,
-		maxEOFWait:    30 * time.Second,
+func NewListener(config config.Config, engine query.EngineInterface) *Listener {
+	return &Listener{
+		Port: config.ReadPort,
+		Handler: &Handler{
+			QueryEngine:    engine,
+			closeChan:      make(chan int),
+			MaxConnections: config.MaxConnections,
+			maxEOFWait:     30 * time.Second,
+		},
+		Type: TCP,
 	}
 }
 
-func (w *WriteHandler) listen(listener net.Listener) {
+func (h *Handler) close() error {
+	h.closeChan <- 0
+	close(h.closeChan)
+	return nil
+}
+
+func (h *Handler) listen(listener net.Listener) {
 	defer func(listener net.Listener) {
 		err := listener.Close()
 		if err != nil {
@@ -35,30 +43,26 @@ func (w *WriteHandler) listen(listener net.Listener) {
 		}
 	}(listener)
 
-	workLimit := make(chan int, w.MaxConnection)
+	workLimit := make(chan int, h.MaxConnections)
 
 	for {
 		select {
-		case <-w.closeChan:
+		case <-h.closeChan:
 			return
 		default:
 			conn, err := listener.Accept()
 			if err != nil {
 				log.Println("Error accepting connection: ", err)
-				continue
+				return
 			}
 			workLimit <- 0
-
-			if err != nil {
-				panic(err)
-			}
 
 			go func(conn net.Conn) {
 				defer func() {
 					<-workLimit
 				}()
 
-				err := w.handleWriteConnection(conn)
+				err := h.handleConnection(conn)
 				if err != nil {
 					log.Println("Error handling write connection: ", err)
 					return
@@ -69,8 +73,8 @@ func (w *WriteHandler) listen(listener net.Listener) {
 	}
 }
 
-func (w *WriteHandler) handleWriteConnection(conn net.Conn) error {
-	log.Println("New write connection from: ", conn.RemoteAddr())
+func (h *Handler) handleConnection(conn net.Conn) error {
+	log.Println("New connection from: ", conn.RemoteAddr())
 
 	defer func(conn net.Conn) {
 		err := conn.Close()
@@ -80,18 +84,17 @@ func (w *WriteHandler) handleWriteConnection(conn net.Conn) error {
 	}(conn)
 
 	wait := 1 * time.Second
-
 	scanner := bufio.NewScanner(conn)
 
-	for wait <= w.maxEOFWait {
+	for wait <= h.maxEOFWait {
 		for scanner.Scan() {
 			line := scanner.Text()
 			if len(line) == 0 {
 				break
 			}
 			wait = 1 * time.Second // Reset wait time
-
-			response := w.QueryEngine.Execute(line)
+			var response string
+			response = h.QueryEngine.ExecuteQuery(line)
 			_, err := conn.Write([]byte(response))
 			if err != nil {
 				log.Println("Error writing to connection: ", err)

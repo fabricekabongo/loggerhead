@@ -13,9 +13,13 @@ var (
 	version           = "1.0"
 )
 
+type EngineInterface interface {
+	ExecuteQuery(query string) string
+}
+
 type Engine struct {
-	World *w.World
-	Chain []Processor
+	world *w.World
+	chain []Processor
 }
 
 type Processor interface {
@@ -23,10 +27,10 @@ type Processor interface {
 	CanProcess(query string) bool
 }
 
-func NewQueryEngine(world *w.World) *Engine {
+func NewQueryEngine(world *w.World) EngineInterface {
 	return &Engine{
-		World: world,
-		Chain: []Processor{
+		world: world,
+		chain: []Processor{
 			&GetQueryProcessor{World: world},
 			&DeleteQueryProcessor{World: world},
 			&SaveQueryProcessor{World: world},
@@ -35,10 +39,10 @@ func NewQueryEngine(world *w.World) *Engine {
 	}
 }
 
-func NewReadQueryEngine(world *w.World) *Engine {
+func NewReadQueryEngine(world *w.World) EngineInterface {
 	return &Engine{
-		World: world,
-		Chain: []Processor{
+		world: world,
+		chain: []Processor{
 			&GetQueryProcessor{World: world},
 			&PolyQueryProcessor{World: world},
 		},
@@ -47,24 +51,24 @@ func NewReadQueryEngine(world *w.World) *Engine {
 
 func NewWriteQueryEngine(world *w.World) *Engine {
 	return &Engine{
-		World: world,
-		Chain: []Processor{
+		world: world,
+		chain: []Processor{
 			&SaveQueryProcessor{World: world},
 			&DeleteQueryProcessor{World: world},
 		},
 	}
 }
 
-func (qp *Engine) IsWriteQuery(query string) bool {
+func (qp *Engine) isWriteQuery(query string) bool {
 	return strings.HasPrefix(query, "SAVE") || strings.HasPrefix(query, "DELETE")
 }
 
-func (qp *Engine) IsReadQuery(query string) bool {
+func (qp *Engine) isReadQuery(query string) bool {
 	return strings.HasPrefix(query, "GET") || strings.HasPrefix(query, "POLY")
 }
 
-func (qp *Engine) Execute(query string) string {
-	for _, processor := range qp.Chain {
+func (qp *Engine) ExecuteQuery(query string) string {
+	for _, processor := range qp.chain {
 		if processor.CanProcess(query) {
 			return processor.Execute(query)
 		}
@@ -82,7 +86,7 @@ type GetQueryProcessor struct {
 
 func (p *GetQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -125,7 +129,7 @@ type DeleteQueryProcessor struct {
 
 func (p *DeleteQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -162,7 +166,7 @@ type SaveQueryProcessor struct {
 
 func (p *SaveQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -214,7 +218,7 @@ type PolyQueryProcessor struct {
 
 func (p *PolyQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {

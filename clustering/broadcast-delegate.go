@@ -16,7 +16,7 @@ type NodeState struct {
 	engine *query.Engine
 }
 
-func NewBroadcastDelegate(engine *query.Engine, broadcasts *memberlist.TransmitLimitedQueue) *BroadcastDelegate {
+func newBroadcastDelegate(engine *query.Engine, broadcasts *memberlist.TransmitLimitedQueue) *BroadcastDelegate {
 	return &BroadcastDelegate{
 		state: &NodeState{
 			engine: engine,
@@ -46,7 +46,7 @@ func (d *BroadcastDelegate) GetBroadcasts(overhead, limit int) [][]byte {
 func (d *BroadcastDelegate) LocalState(join bool) []byte {
 	if join {
 		log.Println("Sharing local state to a new node")
-		return d.state.engine.World.ToBytes()
+		return d.state.engine.world.ToBytes()
 	}
 
 	return []byte{}
@@ -57,6 +57,6 @@ func (d *BroadcastDelegate) MergeRemoteState(buf []byte, join bool) {
 		log.Println("Bootstrapping new node with remote state")
 		w := world.NewWorldFromBytes(buf)
 
-		d.state.engine.World.Merge(w)
+		d.state.engine.world.Merge(w)
 	}
 }

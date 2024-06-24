@@ -247,7 +247,7 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
-			if !queryProcessor.IsWriteQuery(query) {
+			if !queryProcessor.isWriteQuery(query) {
 				t.Errorf("Expected true but got false")
 			}
 		})
@@ -258,7 +258,7 @@ func TestQuery(t *testing.T) {
 
 			query := "DELETE ns-id-8 loc-id-9"
 
-			if !queryProcessor.IsWriteQuery(query) {
+			if !queryProcessor.isWriteQuery(query) {
 				t.Errorf("Expected true but got false")
 			}
 		})
@@ -269,7 +269,7 @@ func TestQuery(t *testing.T) {
 
 			query := "GET ns-id-8 loc-id-9"
 
-			if queryProcessor.IsWriteQuery(query) {
+			if queryProcessor.isWriteQuery(query) {
 				t.Errorf("Expected false but got true")
 			}
 		})
@@ -282,7 +282,7 @@ func TestQuery(t *testing.T) {
 
 			query := "GET ns-id-8 loc-id-9"
 
-			if !queryProcessor.IsReadQuery(query) {
+			if !queryProcessor.isReadQuery(query) {
 				t.Errorf("Expected true but got false")
 			}
 		})
@@ -293,7 +293,7 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
-			if queryProcessor.IsReadQuery(query) {
+			if queryProcessor.isReadQuery(query) {
 				t.Errorf("Expected false but got true")
 			}
 		})

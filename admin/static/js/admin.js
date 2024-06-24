@@ -1,3 +1,22 @@
+function renderTableRow(data) {
+    return `
+                <tr>
+                    <td>${data.Name}</td>
+                    <td>${data.Address}</td>
+                    <td>${data.Health}</td>
+                    <td>${data.State}</td>
+                    <td>${data.NodesAlive}</td>
+                    <td>
+                        Heap Size: ${data.MemStats.Alloc} MB <br>
+                        <small>Total Heap Increment: ${data.MemStats.TotalAlloc} MB <br>
+                        Currently Used: ${data.MemStats.Sys} MB <br></small>
+                    </td>
+                    <td>${data.CPUs}</td>
+                    <td>${data.GoRoutines}</td> 
+                </tr>
+             `;
+}
+
 $(document).ready(function() {
     $('data-placeholder').addClass('d-none');
 
@@ -10,41 +29,11 @@ $(document).ready(function() {
             console.log(data);
             $tbody.empty();
 
-            $tbody.append(`
-                <tr>
-                    <td>${data.Name}</td>
-                    <td>${data.Address}</td>
-                    <td>${data.Health}</td>
-                    <td>${data.State}</td>
-                    <td>${data.NodesAlive}</td>
-                    <td>
-                        Heap Size: ${data.MemStats.Alloc} MB <br>
-                        Total Heap Increment: ${data.MemStats.TotalAlloc} MB <br>
-                        Currently Used: ${data.MemStats.Sys} MB <br>
-                    </td>
-                    <td>${data.CPUs}</td>
-                    <td>${data.GoRoutines}</td> 
-                </tr>
-             `);
+            $tbody.append(renderTableRow(data));
 
             if (data.Others) {
                 data.Others.forEach(function(other) {
-                    $tbody.append(`
-                        <tr>
-                            <td>${other.Name}</td>
-                            <td>${other.Address}</td>
-                            <td>${other.Health}</td>
-                            <td>${other.State}</td>
-                            <td>${other.NodesAlive}</td>
-                            <td>
-                                Currently Used: ${other.MemStats.Sys} MB <br>
-                                <small>Heap Size: ${other.MemStats.Alloc} MB <br>
-                                All Heap Inc.: ${other.MemStats.TotalAlloc} MB <br></small>
-                            </td>
-                            <td>${other.CPUs}</td>
-                            <td>${other.GoRoutines}</td> 
-                        </tr>
-                    `);
+                    $tbody.append(renderTableRow(data));
                 });
             }
 

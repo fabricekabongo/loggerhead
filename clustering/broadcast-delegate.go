@@ -34,7 +34,7 @@ func (d *BroadcastDelegate) NotifyMsg(buf []byte) {
 		if len(buf) > 0 {
 			command := string(buf)
 
-			d.state.engine.Execute(command)
+			_ = d.state.engine.Execute(command) // Adding the ignored return so if I change the return definition (and add an error for example) the build will fail and I can fix this.
 		}
 	}(buf) // Execute the command in a goroutine to prevent blocking the memberlist
 }

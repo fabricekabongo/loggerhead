@@ -3,8 +3,8 @@ package admin
 import (
 	"embed"
 	"encoding/json"
-	"github.com/fabricekabongo/loggerhead/world"
-	"github.com/hashicorp/memberlist"
+	"github.com/fabricekabongo/loggerhead/clustering"
+	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"html/template"
 	"log"
@@ -30,12 +30,15 @@ func init() {
 }
 
 type OpsServer struct {
-	mList *memberlist.Memberlist
-	world *world.World
+	cluster *clustering.Cluster
+	cfg     config.Config
 }
 
-func NewOpsServer(mList *memberlist.Memberlist, world *world.World) *OpsServer {
-	return &OpsServer{mList: mList, world: world}
+func NewOpsServer(cluster *clustering.Cluster, cfg config.Config) *OpsServer {
+	return &OpsServer{
+		cluster: cluster,
+		cfg:     cfg,
+	}
 }
 
 func (o *OpsServer) Start() {
@@ -70,20 +73,6 @@ type MemStats struct {
 	Sys        uint64
 }
 
-func stateToString(state memberlist.NodeStateType) string {
-	switch state {
-	case memberlist.StateAlive:
-		return "Alive"
-	case memberlist.StateSuspect:
-		return "Suspect"
-	case memberlist.StateLeft:
-		return "Left"
-	case memberlist.StateDead:
-		return "Dead"
-	}
-
-	return "Unknown"
-}
 func (o *OpsServer) AdminData() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var memStats runtime.MemStats
@@ -91,9 +80,9 @@ func (o *OpsServer) AdminData() http.Handler {
 		runtime.ReadMemStats(&memStats)
 
 		data := Data{
-			Name:       o.mList.LocalNode().Name,
-			Address:    o.mList.LocalNode().Addr.String(),
-			NodesAlive: o.mList.NumMembers(),
+			Name:       o.cluster.MemberList().LocalNode().Name,
+			Address:    o.cluster.MemberList().LocalNode().Addr.String(),
+			NodesAlive: o.cluster.MemberList().NumMembers(),
 			MemStats: MemStats{
 				Alloc:      (memStats.Alloc / 1024) / 1024,
 				TotalAlloc: (memStats.TotalAlloc / 1024) / 1024,
@@ -101,17 +90,17 @@ func (o *OpsServer) AdminData() http.Handler {
 			},
 			CPUs:       runtime.NumCPU(),
 			GoRoutines: runtime.NumGoroutine(),
-			Health:     o.mList.GetHealthScore(),
-			State:      stateToString(o.mList.LocalNode().State),
+			Health:     o.cluster.MemberList().GetHealthScore(),
+			State:      clustering.StateToString(o.cluster.MemberList().LocalNode().State),
 		}
 
 		getParams := r.URL.Query()
 		if getParams.Get("proxy") != "true" {
-			members := o.mList.Members()
+			members := o.cluster.MemberList().Members()
 			membersAdminData := make([]Data, 0, len(members))
 
 			for _, member := range members {
-				if member.Name == o.mList.LocalNode().Name {
+				if member.Name == o.cluster.MemberList().LocalNode().Name {
 					continue
 				}
 				httpResp, err := http.Get("http://" + member.Addr.String() + ":20000/admin-data?proxy=true")

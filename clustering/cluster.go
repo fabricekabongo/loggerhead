@@ -22,6 +22,21 @@ type Cluster struct {
 	broadcasts *memberlist.TransmitLimitedQueue
 }
 
+func StateToString(state memberlist.NodeStateType) string {
+	switch state {
+	case memberlist.StateAlive:
+		return "Alive"
+	case memberlist.StateSuspect:
+		return "Suspect"
+	case memberlist.StateLeft:
+		return "Left"
+	case memberlist.StateDead:
+		return "Dead"
+	}
+
+	return "Unknown"
+}
+
 func (c *Cluster) Close(timeout time.Duration) error {
 	err := c.memberList.Leave(timeout)
 	if err != nil {
@@ -61,7 +76,7 @@ func NewCluster(engine *query.Engine, config config.Config) (*Cluster, error) {
 
 	mList, err := memberlist.Create(cfg)
 	if err != nil {
-		log.Println("Failed to create cluster: ", err)
+		log.Println("Failed to create memberlist: ", err)
 		return nil, FailedToCreateCluster
 	}
 

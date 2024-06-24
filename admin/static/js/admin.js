@@ -18,7 +18,7 @@ function renderTableRow(data) {
 }
 
 $(document).ready(function() {
-    $('data-placeholder').addClass('d-none');
+    $('.data-placeholder').addClass('d-none');
 
     $table = $('#data-table');
     $tbody = $table.find('tbody');

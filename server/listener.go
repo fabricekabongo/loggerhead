@@ -2,7 +2,6 @@ package server
 
 import (
 	"bufio"
-	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/fabricekabongo/loggerhead/query"
 	"log"
 	"net"
@@ -16,14 +15,14 @@ type Handler struct {
 	maxEOFWait     time.Duration
 }
 
-func NewListener(config config.Config, engine query.EngineInterface) *Listener {
+func NewListener(port int, maxConn int, maxEOF time.Duration, engine query.EngineInterface) *Listener {
 	return &Listener{
-		Port: config.ReadPort,
+		Port: port,
 		Handler: &Handler{
 			QueryEngine:    engine,
 			closeChan:      make(chan int),
-			MaxConnections: config.MaxConnections,
-			maxEOFWait:     30 * time.Second,
+			MaxConnections: maxConn,
+			maxEOFWait:     maxEOF,
 		},
 		Type: TCP,
 	}

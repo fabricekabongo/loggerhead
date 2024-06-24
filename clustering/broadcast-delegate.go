@@ -34,7 +34,7 @@ func (d *BroadcastDelegate) NotifyMsg(buf []byte) {
 		if len(buf) > 0 {
 			command := string(buf)
 
-			_ = d.state.engine.Execute(command) // Adding the ignored return so if I change the return definition (and add an error for example) the build will fail and I can fix this.
+			_ = d.state.engine.ExecuteQuery(command) // Adding the ignored return so if I change the return definition (and add an error for example) the build will fail and I can fix this.
 		}
 	}(buf) // Execute the command in a goroutine to prevent blocking the memberlist
 }
@@ -46,7 +46,7 @@ func (d *BroadcastDelegate) GetBroadcasts(overhead, limit int) [][]byte {
 func (d *BroadcastDelegate) LocalState(join bool) []byte {
 	if join {
 		log.Println("Sharing local state to a new node")
-		return d.state.engine.world.ToBytes()
+		return d.state.engine.World().ToBytes()
 	}
 
 	return []byte{}
@@ -57,6 +57,6 @@ func (d *BroadcastDelegate) MergeRemoteState(buf []byte, join bool) {
 		log.Println("Bootstrapping new node with remote state")
 		w := world.NewWorldFromBytes(buf)
 
-		d.state.engine.world.Merge(w)
+		d.state.engine.World().Merge(w)
 	}
 }

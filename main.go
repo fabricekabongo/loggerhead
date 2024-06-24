@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"github.com/fabricekabongo/loggerhead/admin"
 	"github.com/fabricekabongo/loggerhead/clustering"
 	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/fabricekabongo/loggerhead/query"
@@ -18,11 +20,16 @@ func main() {
 	worldMap := world.NewWorld()
 	readEngine := query.NewReadQueryEngine(worldMap)
 	writeEngine := query.NewWriteQueryEngine(worldMap)
+	// subscriberEngine := query.NewSubscriberQueryEngine(worldMap)
 
 	cluster, err := clustering.NewCluster(writeEngine, cfg)
 
 	if err != nil {
-		log.Fatal("Failed to create cluster: ", err)
+		if errors.Is(err, clustering.FailedToCreateCluster) {
+			log.Fatal("Failed to create cluster: ", err)
+		} else {
+			log.Println(err)
+		}
 	}
 
 	defer func(cluster *clustering.Cluster) {
@@ -31,12 +38,13 @@ func main() {
 			log.Println("Failed to leave cluster: ", err)
 		}
 	}(cluster)
-	//
-	//opsServer := admin.NewOpsServer(cluster, cfg)
-	//go opsServer.Start()
 
-	writer := server.NewListener(cfg, writeEngine)
-	reader := server.NewListener(cfg, readEngine)
+	opsServer := admin.NewOpsServer(cluster, cfg)
+	go opsServer.Start()
+
+	writer := server.NewListener(cfg.WritePort, cfg.MaxConnections, cfg.MaxEOFWait, writeEngine)
+	reader := server.NewListener(cfg.ReadPort, cfg.MaxConnections, cfg.MaxEOFWait, readEngine)
+	// subscriber := server.NewListener(cfg, subscriberEngine)
 
 	svr := server.NewServer([]*server.Listener{writer, reader})
 
@@ -63,6 +71,6 @@ func printWelcomeMessage(cfg config.Config, cluster *clustering.Cluster) {
 	fmt.Println("Seed Node: ", cfg.SeedNode)
 	fmt.Println("My IP: ", cluster.MemberList().LocalNode().Addr.String())
 	fmt.Println("Node Name: ", cluster.MemberList().LocalNode().Name)
-	fmt.Println("Node State: ", cluster.MemberList().LocalNode().State)
+	fmt.Println("Node State: ", clustering.StateToString(cluster.MemberList().LocalNode().State))
 	fmt.Println("===========================================================")
 }

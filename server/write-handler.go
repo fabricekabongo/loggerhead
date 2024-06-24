@@ -6,15 +6,8 @@ import (
 	"github.com/hashicorp/memberlist"
 	"log"
 	"net"
-	"sync"
 	"time"
 )
-
-type WriteCommand struct {
-	LodId string  `json:"loc_id"`
-	Lat   float64 `json:"lat"`
-	Lon   float64 `json:"lon"`
-}
 
 type WriteHandler struct {
 	QueryEngine   *query.Engine
@@ -30,7 +23,7 @@ func NewWriteHandler(engine *query.Engine, broadcasts *memberlist.TransmitLimite
 		closeChan:     make(chan struct{}),
 		Broadcasts:    broadcasts,
 		MaxConnection: maxConnections,
-		maxEOFWait:    30 * time.Second, // 1 minutes
+		maxEOFWait:    30 * time.Second,
 	}
 }
 
@@ -42,10 +35,7 @@ func (w *WriteHandler) listen(listener net.Listener) {
 		}
 	}(listener)
 
-	waitGroup := sync.WaitGroup{}
 	workLimit := make(chan int, w.MaxConnection)
-
-	defer waitGroup.Wait()
 
 	for {
 		select {
@@ -57,7 +47,6 @@ func (w *WriteHandler) listen(listener net.Listener) {
 				log.Println("Error accepting connection: ", err)
 				continue
 			}
-			waitGroup.Add(1)
 			workLimit <- 0
 
 			if err != nil {
@@ -67,7 +56,6 @@ func (w *WriteHandler) listen(listener net.Listener) {
 			go func(conn net.Conn) {
 				defer func() {
 					<-workLimit
-					waitGroup.Done()
 				}()
 
 				err := w.handleWriteConnection(conn)

@@ -20,32 +20,39 @@ func CreateRandomLocation(seed int) (*world.Location, error) {
 }
 
 func BenchmarkDatabase(b *testing.B) {
-	main()
+	var connPool map[int]net.Conn
+	connPool = make(map[int]net.Conn, 40)
+	for i := 0; i < 40; i++ {
+		conn, err := net.Dial("tcp", "localhost:19999")
+		if err != nil {
+			b.Fatal("Failed to connect to the database: ", err)
+
+		}
+		connPool[i] = conn
+	}
+
+	defer func() {
+		for _, conn := range connPool {
+			err := conn.Close()
+			if err != nil {
+				b.Error("Failed to close the connection: ", err)
+			}
+		}
+	}()
+
 	b.Run("Write to DB", func(b *testing.B) {
 		count := atomic.Uint64{}
-		connPool := make([]net.Conn, 0, 20)
-		for i := 0; i < 20; i++ {
-			conn, err := net.Dial("tcp", "localhost:19999")
-			if err != nil {
-				b.Error("Failed to connect to the database: ", err)
-			}
-			connPool = append(connPool, conn)
-		}
-
-		defer func() {
-			for _, conn := range connPool {
-				err := conn.Close()
-				if err != nil {
-					b.Error("Failed to close the connection: ", err)
-				}
-			}
-		}()
 
 		b.RunParallel(func(pb *testing.PB) {
 			for pb.Next() {
 				i := int(count.Load())
 				count.Add(1)
-				conn := connPool[i%20]
+				conn, ok := connPool[i%20]
+
+				if !ok {
+					b.Error("Failed to get a connection from the pool")
+					return
+				}
 
 				loc, err := CreateRandomLocation(int(i) % 1000000)
 				if err != nil {

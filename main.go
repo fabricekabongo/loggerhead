@@ -12,23 +12,11 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"runtime/pprof"
 	"syscall"
 	"time"
 )
 
 func main() {
-	f, err := os.Create("loggerhead.prof")
-	if err != nil {
-		panic("Failed to create profile file")
-	}
-
-	err = pprof.StartCPUProfile(f)
-	if err != nil {
-		log.Fatal("Failed to start CPU profile: ", err)
-	}
-
-	defer pprof.StopCPUProfile()
 	start := time.Now()
 	cfg := config.GetConfig()
 

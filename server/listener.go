@@ -105,7 +105,6 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 			continue
 		}
 		startOfEOF = time.Time{}
-		start := time.Now()
 		line := scanner.Text()
 		if len(line) == 0 {
 			log.Println("Empty line received. Closing connection")
@@ -119,8 +118,6 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 			log.Println("Error writing to connection: ", err)
 			return err
 		}
-
-		log.Println("Query took: ", time.Since(start))
 
 	}
 

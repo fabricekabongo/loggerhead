@@ -1,3 +1,4 @@
+# This docker compose is for test purpose and not indicative of how the database should be ran
 services:
     seed:
         build:
@@ -7,7 +8,7 @@ services:
             - "19999:19999"
             - "19998:19998"
 
-    others:
+    secondary:
         depends_on:
             -   seed
         build:
@@ -18,6 +19,14 @@ services:
             - "30000:20000"
             - "39999:19999"
             - "39998:19998"
+# Others so we can scale up the cluster easily without being affected by the host ports
+    other:
+        depends_on:
+            - seed
+        build:
+            context: .
+        environment:
+            - SEED_NODE=seed
 
 networks:
     default:

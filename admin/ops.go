@@ -65,6 +65,7 @@ type Data struct {
 	Others     []Data
 	State      string
 	Address    string
+	QueueCount int
 }
 
 type MemStats struct {
@@ -92,6 +93,7 @@ func (o *OpsServer) AdminData() http.Handler {
 			GoRoutines: runtime.NumGoroutine(),
 			Health:     o.cluster.MemberList().GetHealthScore(),
 			State:      clustering.StateToString(o.cluster.MemberList().LocalNode().State),
+			QueueCount: o.cluster.Broadcasts().NumQueued(),
 		}
 
 		getParams := r.URL.Query()

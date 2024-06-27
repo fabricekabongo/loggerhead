@@ -10,10 +10,25 @@ import (
 	"github.com/fabricekabongo/loggerhead/server"
 	"github.com/fabricekabongo/loggerhead/world"
 	"log"
+	"os"
+	"os/signal"
+	"runtime/pprof"
+	"syscall"
 	"time"
 )
 
 func main() {
+	f, err := os.Create("loggerhead.prof")
+	if err != nil {
+		panic("Failed to create profile file")
+	}
+
+	err = pprof.StartCPUProfile(f)
+	if err != nil {
+		log.Fatal("Failed to start CPU profile: ", err)
+	}
+
+	defer pprof.StopCPUProfile()
 	start := time.Now()
 	cfg := config.GetConfig()
 
@@ -56,8 +71,27 @@ func main() {
 	defer svr.Stop()
 
 	printWelcomeMessage(cfg, cluster)
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	go func() {
+		s := <-sigc
+		log.Println("Received signal: ", s)
+		svr.Stop()
+		close(sigc)
+		err := cluster.Close(0)
+		if err != nil {
+			return
+		}
+		os.Exit(0)
+	}()
 
 	svr.Start()
+
+	return
 }
 
 func printWelcomeMessage(cfg config.Config, cluster *clustering.Cluster) {

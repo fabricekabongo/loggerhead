@@ -118,6 +118,8 @@ POLY mynamespace 10.560000 10.560000 15.560000 15.560000
 ## Writing
 You will need to connect to port 19999 to write data to the database.
 
+*try using short names for the namespace and id, as I use golang maps to store the data* and the maps are faster with short strings as keys.
+
 ## SAVE
 ```shell
 telnet localhost 19999

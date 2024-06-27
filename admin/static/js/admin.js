@@ -13,6 +13,7 @@ function renderTableRow(data) {
                     </td>
                     <td>${data.CPUs}</td>
                     <td>${data.GoRoutines}</td> 
+                    <td>${data.QueueCount}</td>
                 </tr>
              `;
 }
@@ -33,7 +34,7 @@ $(document).ready(function() {
 
             if (data.Others) {
                 data.Others.forEach(function(other) {
-                    $tbody.append(renderTableRow(data));
+                    $tbody.append(renderTableRow(other));
                 });
             }
 

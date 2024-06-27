@@ -24,7 +24,6 @@ type Location struct {
 	lon       float64
 	ns        string
 	updatedAt time.Time
-	hash      string
 }
 
 func NewLocation(ns string, id string, lat float64, lon float64) (*Location, error) {
@@ -47,13 +46,30 @@ func NewLocation(ns string, id string, lat float64, lon float64) (*Location, err
 		updatedAt: time.Now(),
 	}
 
-	loc.updateHash()
-
 	return loc, nil
 }
 
-func (l *Location) updateHash() {
-	l.hash = fmt.Sprintf("%s,%s,%f,%f", l.ns, l.id, l.lat, l.lon)
+func (l *Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
+	if len(id) == 0 {
+		return nil, LocationErrorRequiredId
+	}
+	if len(ns) == 0 {
+		return nil, LocationErrorRequiredNamespace
+	}
+
+	if err := validateLatLon(lat, lon); err != nil {
+		return nil, err
+	}
+
+	loc := &Location{
+		id:        id,
+		lat:       lat,
+		lon:       lon,
+		ns:        ns,
+		updatedAt: time.Now(),
+	}
+
+	return loc, nil
 }
 
 func (l *Location) Update(lat float64, lon float64) error {
@@ -66,7 +82,6 @@ func (l *Location) Update(lat float64, lon float64) error {
 	l.lat = lat
 	l.lon = lon
 	l.updatedAt = time.Now()
-	l.updateHash()
 
 	return nil
 }
@@ -106,8 +121,4 @@ func (l *Location) Ns() string {
 
 func (l *Location) UpdatedAt() time.Time {
 	return l.updatedAt
-}
-
-func (l *Location) Hash() string {
-	return l.hash
 }

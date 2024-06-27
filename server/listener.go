@@ -76,41 +76,52 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 	log.Println("New connection from: ", conn.RemoteAddr())
 
 	defer func(conn net.Conn) {
+		log.Println("Closing connection from: ", conn.RemoteAddr())
 		err := conn.Close()
 		if err != nil {
 			log.Println("Error closing connection: ", err)
 		}
 	}(conn)
 
-	wait := 1 * time.Second
 	scanner := bufio.NewScanner(conn)
 
-	for wait <= h.maxEOFWait {
-		for scanner.Scan() {
-			line := scanner.Text()
-			if len(line) == 0 {
-				break
-			}
-			wait = 1 * time.Second // Reset wait time
-			var response string
-			response = h.QueryEngine.ExecuteQuery(line)
-			_, err := conn.Write([]byte(response))
-			if err != nil {
-				log.Println("Error writing to connection: ", err)
+	var startOfEOF time.Time
+
+	for {
+		if !scanner.Scan() {
+			if err := scanner.Err(); err != nil {
+				log.Println("Error reading from connection ", err)
 				return err
 			}
+
+			if startOfEOF.IsZero() {
+				startOfEOF = time.Now()
+			} else {
+				if time.Since(startOfEOF) > h.maxEOFWait {
+					return nil
+				}
+			}
+
+			continue
+		}
+		startOfEOF = time.Time{}
+		start := time.Now()
+		line := scanner.Text()
+		if len(line) == 0 {
+			log.Println("Empty line received. Closing connection")
+			break
 		}
 
-		if err := scanner.Err(); err != nil {
-			log.Println("Error reading from connection ", err)
+		var response string
+		response = h.QueryEngine.ExecuteQuery(line)
+		_, err := conn.Write([]byte(response))
+		if err != nil {
+			log.Println("Error writing to connection: ", err)
 			return err
 		}
 
-		if scanner.Err() == nil {
-			wait *= 2 // Exponential backoff
-			log.Println("EOF detected. Waiting for ", wait, " before trying again")
-			time.Sleep(wait)
-		}
+		log.Println("Query took: ", time.Since(start))
+
 	}
 
 	return nil

@@ -73,6 +73,7 @@ func NewCluster(engine *query.Engine, config config.Config) (*Cluster, error) {
 	cfg.BindPort = config.ClusterPort
 	cfg.AdvertisePort = config.ClusterPort
 	cfg.Delegate = delegate
+	cfg.GossipInterval = 20 * time.Millisecond
 
 	mList, err := memberlist.Create(cfg)
 	if err != nil {

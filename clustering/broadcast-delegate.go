@@ -30,13 +30,13 @@ func (d *BroadcastDelegate) NodeMeta(limit int) []byte {
 }
 
 func (d *BroadcastDelegate) NotifyMsg(buf []byte) {
-	go func(buf []byte) {
-		if len(buf) > 0 {
-			command := string(buf)
+	if len(buf) > 0 {
+		command := string(buf)
 
-			_ = d.state.engine.ExecuteQuery(command) // Adding the ignored return so if I change the return definition (and add an error for example) the build will fail and I can fix this.
-		}
-	}(buf) // Execute the command in a goroutine to prevent blocking the memberlist
+		_ = d.state.engine.ExecuteQuery(command)
+		log.Println("Received cluster command: ", command)
+	}
+
 }
 
 func (d *BroadcastDelegate) GetBroadcasts(overhead, limit int) [][]byte {

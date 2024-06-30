@@ -17,8 +17,8 @@ func TestQuery(t *testing.T) {
 
 			query := fmt.Sprintf("%s %s %s", strconv.Itoa(int(rand.Int32())), strconv.Itoa(int(rand.Int32())), strconv.Itoa(int(rand.Int32())))
 
-			data := queryProcessor.Execute(query)
-			if data != "1.0,invalid query" {
+			data := queryProcessor.ExecuteQuery(query)
+			if data != "1.0,\"invalid query\"\n" {
 				t.Errorf("Expected \"1.0,invalid query\" but got %v", data)
 			}
 		})
@@ -36,10 +36,10 @@ func TestQuery(t *testing.T) {
 
 			query := "GET ns-id-8 loc-id-9"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,ns-id-8,loc-id-9,1.000000,2.000000" {
-				t.Errorf("Expected '1.0,ns-id-8,loc-id-9,1.000000,2.000000' but got %v", data)
+			if data != "1.0,ns-id-8,loc-id-9,1.000000,2.000000\n1.0,done\n" {
+				t.Errorf("Expected '1.0,ns-id-8,loc-id-9,1.000000,2.000000\n' but got %v", data)
 			}
 		})
 
@@ -49,10 +49,10 @@ func TestQuery(t *testing.T) {
 
 			query := "GET ns-id-8 loc-id-9"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0," {
-				t.Errorf("Expected '1.0,' but got %v", data)
+			if data != "1.0,done\n" {
+				t.Errorf("Expected '1.0,done\n' but got %v", data)
 			}
 		})
 	})
@@ -68,15 +68,15 @@ func TestQuery(t *testing.T) {
 
 			query := "DELETE ns-id-8 loc-id-9"
 
-			data := queryProcessor.Execute(query)
-			if data != "1.0,deleted" {
+			data := queryProcessor.ExecuteQuery(query)
+			if data != "1.0,deleted\n" {
 				t.Errorf("Expected \"1.0,deleted\" got %v", data)
 			}
 
 			query = "GET ns-id-8 loc-id-9"
 
-			data = queryProcessor.Execute(query)
-			if data != "1.0," {
+			data = queryProcessor.ExecuteQuery(query)
+			if data != "1.0,done\n" {
 				t.Errorf("Expected '1.0,' but got %v", data)
 			}
 		})
@@ -88,18 +88,18 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,saved" {
+			if data != "1.0,saved\n" {
 				t.Errorf("Expected '1.0,saved' but got %v", data)
 			}
 
 			query = "GET ns-id-8 loc-id-9"
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,ns-id-8,loc-id-9,1.000000,2.000000" {
-				t.Errorf("Expected 'ns-id-8,loc-id-9,1.000000,2.000000' but got %v", data)
+			if data != "1.0,ns-id-8,loc-id-9,1.000000,2.000000\n1.0,done\n" {
+				t.Errorf("Expected 'ns-id-8,loc-id-9,1.000000,2.000000\n1.0,done\n' but got %v", data)
 			}
 		})
 
@@ -109,26 +109,26 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,saved" {
+			if data != "1.0,saved\n" {
 				t.Errorf("Expected '1.0,saved' but got %v", data)
 			}
 
 			query = "SAVE ns-id-8 loc-id-9 2.0 3.0"
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,saved" {
+			if data != "1.0,saved\n" {
 				t.Errorf("Expected '1.0,saved' but got %v", data)
 			}
 
 			query = "GET ns-id-8 loc-id-9"
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,ns-id-8,loc-id-9,2.000000,3.000000" {
-				t.Errorf("Expected 'ns-id-8,loc-id-9,2.000000,3.000000' but got %v", data)
+			if data != "1.0,ns-id-8,loc-id-9,2.000000,3.000000\n1.0,done\n" {
+				t.Errorf("Expected 'ns-id-8,loc-id-9,2.000000,3.000000\n1.0,done\n' but got %v", data)
 			}
 		})
 
@@ -138,18 +138,18 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 200.0"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,invalid longitude" {
-				t.Errorf("Expected \"1.0,invalid longitude\" but got %v", data)
+			if data != "1.0,\"invalid longitude\"\n" {
+				t.Errorf("Expected \"1.0,\"invalid longitude\"\n\" but got %v", data)
 			}
 
 			query = "GET ns-id-8 loc-id-9"
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0," {
-				t.Errorf("Expected \"1.0,\" but got %v", data)
+			if data != "1.0,done\n" {
+				t.Errorf("Expected \"1.0,done\n\" but got %v", data)
 			}
 		})
 		t.Run("should return an error if the latitude is invalid", func(t *testing.T) {
@@ -158,18 +158,18 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 100 80"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,invalid latitude" {
-				t.Errorf("Expected \"1.0,invalid latitude\" but got %v", data)
+			if data != "1.0,\"invalid latitude\"\n" {
+				t.Errorf("Expected \"1.0,invalid latitude\n\" but got %v", data)
 			}
 
 			query = "GET ns-id-8 loc-id-9"
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0," {
-				t.Errorf("Expected \"1.0,\" but got %v", data)
+			if data != "1.0,done\n" {
+				t.Errorf("Expected \"1.0,done\n\" but got %v", data)
 			}
 		})
 		t.Run("should return an error if location aren't floats", func(t *testing.T) {
@@ -178,17 +178,17 @@ func TestQuery(t *testing.T) {
 
 			query := "SAVE ns-id-8 loc-id-9 ina 90"
 
-			data := queryProcessor.Execute(query)
+			data := queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,Invalid float64 value for latitude" {
+			if data != "1.0,\"Invalid float64 value for latitude\"\n" {
 				t.Errorf("Expected \"1.0,Invalid float64 value for latitude\" but got %v", data)
 			}
 
 			query = "SAVE ns-id-8 loc-id-9 70 monga"
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
-			if data != "1.0,Invalid float64 value for longitude" {
+			if data != "1.0,\"Invalid float64 value for longitude\"\n" {
 				t.Errorf("Expected \"1.0,Invalid float64 value for longitude\" but got %v", data)
 			}
 		})
@@ -199,27 +199,27 @@ func TestQuery(t *testing.T) {
 			queryProcessor := NewQueryEngine(world)
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
-			data := queryProcessor.Execute(query)
-			if data != "1.0,saved" {
+			data := queryProcessor.ExecuteQuery(query)
+			if data != "1.0,saved\n" {
 				t.Errorf("expected \"1.0,saved\" got %v", data)
 			}
 
-			query = "SAVE ns-id-8 loc-id-9 1.5 2.0"
-			data = queryProcessor.Execute(query)
-			if data != "1.0,saved" {
+			query = "SAVE ns-id-8 loc-id-10 1.5 2.0"
+			data = queryProcessor.ExecuteQuery(query)
+			if data != "1.0,saved\n" {
 				t.Errorf("expected \"1.0,saved\" got %v", data)
 			}
 
 			query = "POLY ns-id-8 0 0 2 2" // lat1 lon1 lat2 lon2
 
-			data = queryProcessor.Execute(query)
+			data = queryProcessor.ExecuteQuery(query)
 
 			stringBuilder := strings.Builder{}
 			stringBuilder.WriteString("1.0,ns-id-8,loc-id-9,1.000000,2.000000")
 			stringBuilder.WriteString("\n")
-			stringBuilder.WriteString("1.0,ns-id-8,loc-id-9,1.500000,2.000000")
+			stringBuilder.WriteString("1.0,ns-id-8,loc-id-10,1.500000,2.000000")
 			stringBuilder.WriteString("\n")
-			stringBuilder.WriteString("1.0,done")
+			stringBuilder.WriteString("1.0,done\n")
 
 			if data != stringBuilder.String() {
 				t.Errorf("Expected '%s' but got %v", stringBuilder.String(), data)
@@ -227,65 +227,15 @@ func TestQuery(t *testing.T) {
 		})
 
 		t.Run("should return an empty string if the result is empty", func(t *testing.T) {
-
-		})
-	})
-
-	t.Run("Is Write Query", func(t *testing.T) {
-		t.Run("should return true if the query is a write query for Save", func(t *testing.T) {
 			world := w.NewWorld()
 			queryProcessor := NewQueryEngine(world)
 
-			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
+			query := "POLY ns-id-8 0 0 2 2" // lat1 lon1 lat2 lon2
 
-			if !queryProcessor.IsWriteQuery(query) {
-				t.Errorf("Expected true but got false")
-			}
-		})
+			data := queryProcessor.ExecuteQuery(query)
 
-		t.Run("should return true if the query is a write query for Delete", func(t *testing.T) {
-			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
-
-			query := "DELETE ns-id-8 loc-id-9"
-
-			if !queryProcessor.IsWriteQuery(query) {
-				t.Errorf("Expected true but got false")
-			}
-		})
-
-		t.Run("should return false if the query is not a write query", func(t *testing.T) {
-			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
-
-			query := "GET ns-id-8 loc-id-9"
-
-			if queryProcessor.IsWriteQuery(query) {
-				t.Errorf("Expected false but got true")
-			}
-		})
-	})
-
-	t.Run("Is Read Query", func(t *testing.T) {
-		t.Run("should return true if the query is a read query for Get", func(t *testing.T) {
-			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
-
-			query := "GET ns-id-8 loc-id-9"
-
-			if !queryProcessor.IsReadQuery(query) {
-				t.Errorf("Expected true but got false")
-			}
-		})
-
-		t.Run("should return false if the query is not a read query", func(t *testing.T) {
-			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
-
-			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
-
-			if queryProcessor.IsReadQuery(query) {
-				t.Errorf("Expected false but got true")
+			if data != "1.0,done\n" {
+				t.Errorf("Expected '1.0,' but got %v", data)
 			}
 		})
 	})

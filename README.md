@@ -6,7 +6,7 @@
 
 ### TODO
 
-- [ ] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
+- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
 - [ ] Improve the usage of Prometheus. Planned for `0.0.2`
 - [ ] Implement subscription to Polygon's updates. Planned for `0.0.3`
 - [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.4`
@@ -26,7 +26,7 @@
 - [X] Implement the admin interface
 - [X] Implement the gossip protocol
 
-Loggerhead is a geolocation in-memory database built in Go. It is designed to be fast, efficient and to be used in a distributed environment
+Loggerhead is a geospatial in-memory database built in Go. It is designed to be fast, efficient and to be used in a distributed environment
 like Kubernetes.
 
 It uses a gossip-based membership system and performs a best-effort synchronization of the nodes.
@@ -125,6 +125,8 @@ POLY mynamespace 10.560000 10.560000 15.560000 15.560000
 
 ## Writing
 You will need to connect to port 19999 to write data to the database.
+
+*try using short names for the namespace and id, as I use golang maps to store the data* and the maps are faster with short strings as keys.
 
 ## SAVE
 ```shell

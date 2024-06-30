@@ -4,6 +4,7 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"time"
 )
 
 var (
@@ -18,47 +19,107 @@ func init() {
 }
 
 type Location struct {
-	Id  string  `json:"id"`
-	Lat float64 `json:"lat"`
-	Lon float64 `json:"lon"`
-	Ns  string  `json:"ns"`
+	id        string
+	lat       float64
+	lon       float64
+	ns        string
+	updatedAt time.Time
+	Node      *TreeNode
 }
 
-func NewLocation(ns string, locId string, lat float64, lon float64) (*Location, error) {
-	loc := &Location{
-		Id:  locId,
-		Lat: lat,
-		Lon: lon,
-		Ns:  ns,
+func NewLocation(ns string, id string, lat float64, lon float64) (*Location, error) {
+	if len(id) == 0 {
+		return nil, LocationErrorRequiredId
+	}
+	if len(ns) == 0 {
+		return nil, LocationErrorRequiredNamespace
 	}
 
-	if err := loc.validate(); err != nil {
+	if err := validateLatLon(lat, lon); err != nil {
 		return nil, err
+	}
+
+	loc := &Location{
+		id:        id,
+		lat:       lat,
+		lon:       lon,
+		ns:        ns,
+		updatedAt: time.Now(),
 	}
 
 	return loc, nil
 }
 
-func (l *Location) validate() error {
-	if len(l.Id) == 0 {
-		return LocationErrorRequiredId
+func (l *Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
+	if len(id) == 0 {
+		return nil, LocationErrorRequiredId
+	}
+	if len(ns) == 0 {
+		return nil, LocationErrorRequiredNamespace
 	}
 
-	if l.Lat < -90 || l.Lat > 90 {
+	if err := validateLatLon(lat, lon); err != nil {
+		return nil, err
+	}
+
+	loc := &Location{
+		id:        id,
+		lat:       lat,
+		lon:       lon,
+		ns:        ns,
+		updatedAt: time.Now(),
+	}
+
+	return loc, nil
+}
+
+func (l *Location) Update(lat float64, lon float64) error {
+	err := validateLatLon(lat, lon)
+
+	if err != nil {
+		return err
+	}
+
+	l.lat = lat
+	l.lon = lon
+	l.updatedAt = time.Now()
+
+	return nil
+}
+
+func validateLatLon(lat float64, lon float64) error {
+
+	if lat < -90 || lat > 90 {
 		return LocationErrorInvalidLatitude
 	}
 
-	if l.Lon < -180 || l.Lon > 180 {
+	if lon < -180 || lon > 180 {
 		return LocationErrorInvalidLongitude
-	}
-
-	if len(l.Ns) == 0 {
-		return LocationErrorRequiredNamespace
 	}
 
 	return nil
 }
 
 func (l *Location) String() string {
-	return fmt.Sprintf("%s,%s,%f,%f", l.Ns, l.Id, l.Lat, l.Lon)
+	return fmt.Sprintf("%s,%s,%f,%f", l.ns, l.id, l.lat, l.lon)
+}
+
+func (l *Location) Id() string {
+	return l.id
+}
+
+func (l *Location) Lat() float64 {
+	return l.lat
+}
+
+func (l *Location) Lon() float64 {
+	return l.lon
+}
+
+func (l *Location) Ns() string {
+	return l.ns
+}
+
+func (l *Location) UpdatedAt() time.Time {
+	return l.updatedAt
 }

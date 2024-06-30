@@ -2,189 +2,99 @@ package main
 
 import (
 	"errors"
-	"flag"
 	"fmt"
 	"github.com/fabricekabongo/loggerhead/admin"
 	"github.com/fabricekabongo/loggerhead/clustering"
+	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/fabricekabongo/loggerhead/query"
-	server2 "github.com/fabricekabongo/loggerhead/server"
+	"github.com/fabricekabongo/loggerhead/server"
 	"github.com/fabricekabongo/loggerhead/world"
-	"github.com/hashicorp/memberlist"
 	"log"
-	"net"
 	"os"
-	"strconv"
+	"os/signal"
+	"syscall"
 	"time"
-)
-
-var (
-	FailedToJoinCluster       = errors.New("failed to join cluster")
-	FailedToCreateCluster     = errors.New("failed to create cluster")
-	FailedToExtractIPsFromDNS = errors.New("failed to extract IPs from DNS")
 )
 
 func main() {
 	start := time.Now()
-	clusterDNS, maxConnections := populateEnv()
+	cfg := config.GetConfig()
 
 	worldMap := world.NewWorld()
+	readEngine := query.NewReadQueryEngine(worldMap)
+	writeEngine := query.NewWriteQueryEngine(worldMap)
+	// subscriberEngine := query.NewSubscriberQueryEngine(worldMap)
 
-	mList, broadcasts, err := createClustering(clusterDNS, worldMap)
+	cluster, err := clustering.NewCluster(writeEngine, cfg)
 
-	if errors.Is(err, FailedToCreateCluster) {
-		log.Fatal("Failed to create cluster: ", err)
-	}
-	if errors.Is(err, FailedToJoinCluster) {
-		log.Println("Failed to join cluster: ", err)
-	}
-	if errors.Is(err, FailedToExtractIPsFromDNS) {
-		log.Println("Failed to extract IPs from DNS: ", err)
+	if err != nil {
+		if errors.Is(err, clustering.FailedToCreateCluster) {
+			log.Fatal("Failed to create cluster: ", err)
+		} else {
+			log.Println(err)
+		}
 	}
 
-	defer func(mList *memberlist.Memberlist, timeout time.Duration) {
-		err := mList.Leave(timeout)
+	defer func(cluster *clustering.Cluster) {
+		err := cluster.Close(0)
 		if err != nil {
 			log.Println("Failed to leave cluster: ", err)
 		}
-	}(mList, 0)
+	}(cluster)
 
-	fmt.Println("===========================================================")
-	fmt.Println("Starting the Database Server")
-	fmt.Println("Cluster DNS: ", clusterDNS)
-	fmt.Println("Use the following ports for the following services:")
-	fmt.Println("Writing location update: 19999")
-	fmt.Println("Reading location update: 19998")
-	fmt.Println("Max Concurrent Connections per port (19999 & 19998):", maxConnections)
-	fmt.Println("Admin UI (/) & Metrics(/metrics): 20000")
-	fmt.Println("Clustering: 20001")
-	fmt.Println("===========================================================")
-	opsServer := admin.NewOpsServer(mList, worldMap)
+	clusterEngine := clustering.NewEngineDecorator(cluster, writeEngine)
+
+	opsServer := admin.NewOpsServer(cluster, cfg)
 	go opsServer.Start()
 
-	readEngine := query.NewReadQueryEngine(worldMap)
-	writeEngine := query.NewWriteQueryEngine(worldMap)
+	writer := server.NewListener(cfg.WritePort, cfg.MaxConnections, cfg.MaxEOFWait, clusterEngine) // This is the writer listener (for writes and broadcasts)
+	reader := server.NewListener(cfg.ReadPort, cfg.MaxConnections, cfg.MaxEOFWait, readEngine)     // This is the reader listener (for reads).
+	// subscriber := server.NewListener(cfg, subscriberEngine)
 
-	writer := server2.NewWriteHandler(writeEngine, broadcasts, maxConnections)
-	reader := server2.NewReadHandler(readEngine, maxConnections)
-
-	server := server2.NewServer(*writer, *reader)
+	svr := server.NewServer([]*server.Listener{writer, reader})
 
 	end := time.Now()
 	fmt.Println("Startup time: ", end.Sub(start))
 
-	defer server.Stop()
-	server.Start()
-}
+	defer svr.Stop()
 
-func createClustering(clusterDNS string, world *world.World) (*memberlist.Memberlist, *memberlist.TransmitLimitedQueue, error) {
-	broadcasts := &memberlist.TransmitLimitedQueue{
-		NumNodes: func() int {
-			return 1 // Replace with the actual number of nodes
-		},
-		RetransmitMult: 3,
-	}
-
-	delegate := clustering.NewBroadcastDelegate(world, broadcasts)
-
-	hostname, err := os.Hostname()
-	if err != nil {
-		log.Fatal("Failed to get hostname: ", err)
-	}
-
-	config := memberlist.DefaultLocalConfig()
-	config.Name = hostname
-	config.BindPort = 20001
-	config.AdvertisePort = 20001
-	config.Delegate = delegate
-
-	mList, err := memberlist.Create(config)
-	if err != nil {
-		log.Println("Failed to create cluster: ", err)
-		return nil, nil, FailedToCreateCluster
-	}
-
-	broadcasts.NumNodes = func() int {
-		return mList.NumMembers()
-	}
-
-	clusterIPs, err := getClusterIPs(clusterDNS)
-	if err != nil {
-		log.Println("Failed to get cluster IPs: ", err)
-		return nil, nil, FailedToExtractIPsFromDNS
-	}
-
-	_, err = mList.Join(clusterIPs)
-	if err != nil {
-		log.Println("Failed to join cluster: ", err)
-		return mList, broadcasts, FailedToJoinCluster
-	}
-
-	return mList, broadcasts, nil
-}
-
-func getClusterIPs(clusterDNS string) ([]string, error) {
-	ips, err := net.LookupIP(clusterDNS)
-	if err != nil {
-		return nil, err
-	}
-	currentIp, err := os.Hostname()
-	if err != nil {
-		return nil, err
-	}
-	// map addresses to strings
-	var clusterIPs []string
-	for _, ip := range ips {
-		if ip.String() == currentIp {
-			continue
-		}
-		clusterIPs = append(clusterIPs, ip.String())
-	}
-
-	return clusterIPs, nil
-}
-
-func populateEnv() (string, int) {
-
-	envClusterDNS := os.Getenv("CLUSTER_DNS")
-	envMaxConnections := os.Getenv("MAX_CONNECTIONS")
-
-	var flagClusterDNS string
-	var flagMaxConnections int
-
-	var clusterDNS string
-	var maxConnections int
-
-	flag.StringVar(&flagClusterDNS, "cluster-dns", "", "Cluster DNS")
-	flag.IntVar(&flagMaxConnections, "max-connections", 20, "Max connections concurrently per port (eg: 20 read, 20 write). Default: 20. Remember this database is supposed to be called by your backend services not by your consumers. So you shouldn't need too many connections.")
-	flag.Parse()
-
-	if envClusterDNS == "" {
-		clusterDNS = flagClusterDNS
-
-		if clusterDNS == "" {
-			log.Fatalln("No environment variable set for CLUSTER_DNS or flag set for cluster-dns")
-		}
-	}
-
-	if envMaxConnections == "" {
-		if flagMaxConnections < 1 {
-			log.Fatalln("Max connections should be greater than 0")
-		}
-
-		maxConnections = flagMaxConnections
-
-	} else {
-		convMaxConnections, err := strconv.Atoi(envMaxConnections)
+	printWelcomeMessage(cfg, cluster)
+	sigc := make(chan os.Signal, 1)
+	signal.Notify(sigc,
+		syscall.SIGHUP,
+		syscall.SIGINT,
+		syscall.SIGTERM,
+		syscall.SIGQUIT)
+	go func() {
+		s := <-sigc
+		log.Println("Received signal: ", s)
+		svr.Stop()
+		close(sigc)
+		err := cluster.Close(0)
 		if err != nil {
-			log.Fatalln("Failed to convert max connections to int")
+			return
 		}
+		os.Exit(0)
+	}()
 
-		if convMaxConnections < 1 {
-			log.Fatalln("Max connections should be greater than 0")
-		}
+	svr.Start()
 
-		maxConnections = convMaxConnections
-	}
+	return
+}
 
-	return clusterDNS, maxConnections
+func printWelcomeMessage(cfg config.Config, cluster *clustering.Cluster) {
+	fmt.Println("===========================================================")
+	fmt.Println("Starting the Database Server")
+	fmt.Println("===========================================================")
+	fmt.Println("Read Port: ", cfg.ReadPort)
+	fmt.Println("Write Port: ", cfg.WritePort)
+	fmt.Println("Cluster Port: ", cfg.ClusterPort)
+	fmt.Println("Max Connections: ", cfg.MaxConnections)
+	fmt.Println("Max EOF Wait: ", cfg.MaxEOFWait)
+	fmt.Println("Cluster DNS: ", cfg.ClusterDNS)
+	fmt.Println("Seed Node: ", cfg.SeedNode)
+	fmt.Println("My IP: ", cluster.MemberList().LocalNode().Addr.String())
+	fmt.Println("Node Name: ", cluster.MemberList().LocalNode().Name)
+	fmt.Println("Node State: ", clustering.StateToString(cluster.MemberList().LocalNode().State))
+	fmt.Println("===========================================================")
 }

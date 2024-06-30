@@ -11,25 +11,7 @@ func TestNode(t *testing.T) {
 		t.Parallel()
 		t.Run("Should delete a location", func(t *testing.T) {
 			t.Parallel()
-			node := &TreeNode{
-				Objects: []*Location{
-					{
-						Lat: 1.0,
-						Lon: 1.0,
-						Id:  "locId",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.0,
-						Id:  "locId2",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.2,
-						Id:  "locId3",
-					},
-				},
-			}
+			node := createTestNode(t)
 
 			node.Delete("locId2")
 
@@ -40,50 +22,16 @@ func TestNode(t *testing.T) {
 
 		t.Run("should not panic if the last element in the slice is deleted", func(t *testing.T) {
 			t.Parallel()
-			node := &TreeNode{
-				Objects: []*Location{
-					{
-						Lat: 1.0,
-						Lon: 1.0,
-						Id:  "locId",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.0,
-						Id:  "locId2",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.2,
-						Id:  "locId3",
-					},
-				},
-			}
+
+			node := createTestNode(t)
 
 			node.Delete("locId3")
 		})
 
 		t.Run("should not panic if the first element in the slice is deleted", func(t *testing.T) {
 			t.Parallel()
-			node := &TreeNode{
-				Objects: []*Location{
-					{
-						Lat: 1.0,
-						Lon: 1.0,
-						Id:  "locId",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.0,
-						Id:  "locId2",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.2,
-						Id:  "locId3",
-					},
-				},
-			}
+
+			node := createTestNode(t)
 			waitGroup := sync.WaitGroup{}
 			for i := 0; i < 100; i++ {
 				waitGroup.Add(1)
@@ -98,52 +46,40 @@ func TestNode(t *testing.T) {
 
 		t.Run("should not panic if the last element in the slice is deleted", func(t *testing.T) {
 			t.Parallel()
-			node := &TreeNode{
-				Objects: []*Location{
-					{
-						Lat: 1.0,
-						Lon: 1.0,
-						Id:  "locId",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.0,
-						Id:  "locId2",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.2,
-						Id:  "locId3",
-					},
-				},
-			}
+
+			node := createTestNode(t)
 
 			node.Delete("locId3")
 		})
 
 		t.Run("should not panic if the first element in the slice is deleted", func(t *testing.T) {
 			t.Parallel()
-			node := &TreeNode{
-				Objects: []*Location{
-					{
-						Lat: 1.0,
-						Lon: 1.0,
-						Id:  "locId",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.0,
-						Id:  "locId2",
-					},
-					{
-						Lat: 2.0,
-						Lon: 2.2,
-						Id:  "locId3",
-					},
-				},
-			}
+
+			node := createTestNode(t)
 
 			node.Delete("locId")
 		})
 	})
+}
+
+func createTestNode(t *testing.T) *TreeNode {
+	node := &TreeNode{
+		Objects: make(map[string]*Location, 0),
+	}
+	loc, err := NewLocation("ns", "locId", 1.0, 1.0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	node.Objects[loc.Id()] = loc
+	loc, err = NewLocation("ns", "locId2", 2.0, 2.0)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	node.Objects[loc.Id()] = loc
+	loc, err = NewLocation("ns", "locId3", 2.0, 2.2)
+	if err != nil {
+		t.Fatalf("Unexpected error: %v", err)
+	}
+	node.Objects[loc.Id()] = loc
+	return node
 }

@@ -13,9 +13,13 @@ var (
 	version           = "1.0"
 )
 
+type EngineInterface interface {
+	ExecuteQuery(query string) string
+}
+
 type Engine struct {
-	World *w.World
-	Chain []Processor
+	world *w.World
+	chain []Processor
 }
 
 type Processor interface {
@@ -23,10 +27,10 @@ type Processor interface {
 	CanProcess(query string) bool
 }
 
-func NewQueryEngine(world *w.World) *Engine {
+func NewQueryEngine(world *w.World) EngineInterface {
 	return &Engine{
-		World: world,
-		Chain: []Processor{
+		world: world,
+		chain: []Processor{
 			&GetQueryProcessor{World: world},
 			&DeleteQueryProcessor{World: world},
 			&SaveQueryProcessor{World: world},
@@ -35,10 +39,10 @@ func NewQueryEngine(world *w.World) *Engine {
 	}
 }
 
-func NewReadQueryEngine(world *w.World) *Engine {
+func NewReadQueryEngine(world *w.World) EngineInterface {
 	return &Engine{
-		World: world,
-		Chain: []Processor{
+		world: world,
+		chain: []Processor{
 			&GetQueryProcessor{World: world},
 			&PolyQueryProcessor{World: world},
 		},
@@ -47,24 +51,20 @@ func NewReadQueryEngine(world *w.World) *Engine {
 
 func NewWriteQueryEngine(world *w.World) *Engine {
 	return &Engine{
-		World: world,
-		Chain: []Processor{
+		world: world,
+		chain: []Processor{
 			&SaveQueryProcessor{World: world},
 			&DeleteQueryProcessor{World: world},
 		},
 	}
 }
 
-func (qp *Engine) IsWriteQuery(query string) bool {
-	return strings.HasPrefix(query, "SAVE") || strings.HasPrefix(query, "DELETE")
+func (qp *Engine) World() *w.World {
+	return qp.world
 }
 
-func (qp *Engine) IsReadQuery(query string) bool {
-	return strings.HasPrefix(query, "GET") || strings.HasPrefix(query, "POLY")
-}
-
-func (qp *Engine) Execute(query string) string {
-	for _, processor := range qp.Chain {
+func (qp *Engine) ExecuteQuery(query string) string {
+	for _, processor := range qp.chain {
 		if processor.CanProcess(query) {
 			return processor.Execute(query)
 		}
@@ -72,7 +72,7 @@ func (qp *Engine) Execute(query string) string {
 
 	log.Println(ErrorInvalidQuery.Error(), query)
 
-	return "1.0," + ErrorInvalidQuery.Error()
+	return "1.0,\"" + ErrorInvalidQuery.Error() + "\"\n"
 }
 
 type GetQueryProcessor struct {
@@ -82,7 +82,7 @@ type GetQueryProcessor struct {
 
 func (p *GetQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -102,11 +102,14 @@ func (p *GetQueryProcessor) Execute(query string) string {
 	location, ok := p.World.GetLocation(namespaceID, locationID)
 
 	if !ok {
-		return "1.0,"
+		return "1.0,done\n"
 	}
 
-	return "1.0," + location.String()
+	stringBuilder := strings.Builder{}
+	stringBuilder.WriteString("1.0," + location.String() + "\n")
+	stringBuilder.WriteString("1.0,done\n")
 
+	return stringBuilder.String()
 }
 
 func (p *GetQueryProcessor) CanProcess(query string) bool {
@@ -125,7 +128,7 @@ type DeleteQueryProcessor struct {
 
 func (p *DeleteQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -144,7 +147,7 @@ func (p *DeleteQueryProcessor) Execute(query string) string {
 
 	p.World.Delete(namespaceID, locationID)
 
-	return "1.0,deleted"
+	return "1.0,deleted\n"
 }
 
 func (p *DeleteQueryProcessor) CanProcess(query string) bool {
@@ -162,7 +165,7 @@ type SaveQueryProcessor struct {
 
 func (p *SaveQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -183,20 +186,20 @@ func (p *SaveQueryProcessor) Execute(query string) string {
 
 	latFloat, err := strconv.ParseFloat(latitude, 64)
 	if err != nil {
-		return "1.0," + "Invalid float64 value for latitude"
+		return "1.0," + "\"Invalid float64 value for latitude\"\n"
 	}
 
 	lonFloat, err := strconv.ParseFloat(longitude, 64)
 	if err != nil {
-		return "1.0," + "Invalid float64 value for longitude"
+		return "1.0," + "\"Invalid float64 value for longitude\"\n"
 	}
 
 	err = p.World.Save(namespaceID, locationID, latFloat, lonFloat)
 	if err != nil {
-		return "1.0," + err.Error()
+		return "1.0,\"" + err.Error() + "\"\n"
 	}
 
-	return "1.0,saved"
+	return "1.0,saved\n"
 }
 
 func (p *SaveQueryProcessor) CanProcess(query string) bool {
@@ -214,7 +217,7 @@ type PolyQueryProcessor struct {
 
 func (p *PolyQueryProcessor) Execute(query string) string {
 	if p.World == nil {
-		panic("World is nil")
+		panic("world is nil")
 	}
 
 	if !p.CanProcess(query) {
@@ -231,19 +234,19 @@ func (p *PolyQueryProcessor) Execute(query string) string {
 	ns := chunks[1]
 	lat1, err := strconv.ParseFloat(chunks[2], 64)
 	if err != nil {
-		return "1.0," + "Invalid float64 value for latitude1"
+		return "1.0," + "\"Invalid float64 value for latitude1\"\n"
 	}
 	lon1, err := strconv.ParseFloat(chunks[3], 64)
 	if err != nil {
-		return "1.0," + "Invalid float64 value for longitude1"
+		return "1.0," + "\"Invalid float64 value for longitude1\"\n"
 	}
 	lat2, err := strconv.ParseFloat(chunks[4], 64)
 	if err != nil {
-		return "1.0," + "Invalid float64 value for latitude2"
+		return "1.0," + "\"Invalid float64 value for latitude2\"\n"
 	}
 	lon2, err := strconv.ParseFloat(chunks[5], 64)
 	if err != nil {
-		return "1.0," + "Invalid float64 value for longitude2"
+		return "1.0," + "\"Invalid float64 value for longitude2\"\n"
 	}
 
 	locations := p.World.QueryRange(ns, lat1, lat2, lon1, lon2)
@@ -251,11 +254,10 @@ func (p *PolyQueryProcessor) Execute(query string) string {
 	var result strings.Builder
 
 	for _, location := range locations {
-		result.WriteString("1.0," + location.String())
-		result.WriteString("\n")
+		result.WriteString("1.0," + location.String() + "\n")
 	}
 
-	result.WriteString("1.0,done")
+	result.WriteString("1.0,done\n")
 
 	return result.String()
 }

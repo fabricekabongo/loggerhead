@@ -1,44 +1,67 @@
 package server
 
 import (
-	"fmt"
 	"net"
+	"strconv"
 )
 
 type Server struct {
-	WriteHandler *WriteHandler
-	ReadHandler  *ReadHandler
-	closeChannel chan struct{}
+	listeners    []*Listener
+	closeChannel chan int
 }
 
-func NewServer(writeHandler WriteHandler, readHandler ReadHandler) *Server {
+type ConnectionType string
+
+const (
+	TCP ConnectionType = "tcp"
+	UDP ConnectionType = "udp"
+)
+
+type Listener struct {
+	Port    int
+	Handler ListenerHandler
+	Type    ConnectionType
+}
+
+type ListenerHandler interface {
+	listen(listener net.Listener)
+	close() error
+}
+
+func NewServer(listeners []*Listener) *Server {
 	return &Server{
-		WriteHandler: &writeHandler,
-		ReadHandler:  &readHandler,
-		closeChannel: make(chan struct{}),
+		listeners:    listeners,
+		closeChannel: make(chan int),
 	}
 }
 
 func (s *Server) Stop() {
-	s.closeChannel <- struct{}{}
+	s.closeChannel <- 0
 	close(s.closeChannel)
 }
 
 func (s *Server) Start() {
-	fmt.Println("Opening read and write ports")
-	writerListener, err := net.Listen("tcp", ":19999")
-	if err != nil {
-		panic(err)
+	for _, listener := range s.listeners {
+		go s.startListener(listener)
 	}
-
-	readListener, err := net.Listen("tcp", ":19998")
-	if err != nil {
-		panic(err)
-	}
-
-	go s.WriteHandler.listen(writerListener)
-	go s.ReadHandler.listen(readListener)
-
-	fmt.Println("Read and Write operations ready. Enjoy!")
 	<-s.closeChannel
+	for _, listener := range s.listeners {
+		err := listener.Handler.close()
+		if err != nil {
+			continue
+		}
+	}
+}
+
+func (s *Server) startListener(listener *Listener) {
+	netListener := s.createListener(listener)
+	listener.Handler.listen(netListener)
+}
+
+func (s *Server) createListener(listener *Listener) net.Listener {
+	netListener, err := net.Listen(string(listener.Type), ":"+strconv.Itoa(listener.Port))
+	if err != nil {
+		panic("Error creating listener: " + err.Error())
+	}
+	return netListener
 }

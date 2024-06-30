@@ -2,9 +2,8 @@ package world
 
 import (
 	"errors"
-	"strconv"
+	"math"
 	"sync"
-	"sync/atomic"
 )
 
 var (
@@ -26,22 +25,27 @@ type TreeNode struct {
 	Lon1      float64
 	Lon2      float64
 	mu        sync.RWMutex
-	Objects   []*Location
+	Objects   map[string]*Location
 	Capacity  int
 	IsDivided bool
 }
 
 func NewQuadTree(lat1 float64, lat2 float64, lon1 float64, lon2 float64) *QuadTree {
-	return &QuadTree{
+	qt := &QuadTree{
 		Root: &TreeNode{
 			IsDivided: false,
-			Capacity:  2000,
+			Capacity:  500,
 			Lat1:      lat1,
 			Lat2:      lat2,
 			Lon1:      lon1,
 			Lon2:      lon2,
+			Objects:   make(map[string]*Location),
 		},
 	}
+
+	qt.Root.ForceDivide(5)
+
+	return qt
 }
 
 func (q *QuadTree) Insert(location *Location) error {
@@ -59,24 +63,42 @@ func NewTreeNode(lat1 float64, lat2 float64, lon1 float64, lon2 float64, capacit
 		Lat2:      lat2,
 		Lon1:      lon1,
 		Lon2:      lon2,
-		Objects:   []*Location{},
+		Objects:   make(map[string]*Location),
 	}
 }
 
 func (n *TreeNode) insert(location *Location) error {
 	if location == nil {
-		return TreeErrLocationNil
+		panic("Location is nil. It should never reach this point")
 	}
 	// If the location is not within the bound, return
-	if !(n.Lon1 < location.Lon && n.Lon2 > location.Lon && n.Lat1 < location.Lat && n.Lat2 > location.Lat) {
+	if !(n.Lon1 <= location.lon && location.lon <= n.Lon2 && n.Lat1 <= location.lat && location.lat <= n.Lat2) {
 		return TreeErrLocationOutOfBounds
 	}
 
 	if n.IsDivided {
-		n.insertIntoChildren(location)
+
+		err := n.NW.insert(location)
+		if err != nil {
+			err = n.NE.insert(location)
+			if err != nil {
+				err = n.SW.insert(location)
+				if err != nil {
+					err = n.SE.insert(location)
+				}
+			}
+		}
+
+		return nil
 	}
+
+	// If the node is not divided, insert the location into the node
 	n.mu.Lock()
-	n.Objects = append(n.Objects, location)
+	if location.Node != nil && location.Node != n {
+		location.Node.Delete(location.Id())
+	}
+	n.Objects[location.Id()] = location
+	location.Node = n
 	n.mu.Unlock()
 
 	if len(n.Objects) > n.Capacity {
@@ -90,46 +112,7 @@ func (n *TreeNode) insertIntoChildren(location *Location) {
 	if location == nil {
 		panic("Location is nil. It should never reach this point")
 	}
-	wg := sync.WaitGroup{}
-	wg.Add(4)
-	passedCount := atomic.Int32{}
 
-	go func() {
-		defer wg.Done()
-		err := n.NE.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		err := n.NW.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		err := n.SE.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
-
-	go func() {
-		defer wg.Done()
-		err := n.SW.insert(location)
-		if err == nil {
-			passedCount.Add(1)
-		}
-	}()
-
-	wg.Wait()
-	if passedCount.Load() != 1 {
-		panic("Location should have been inserted into one of the nodes. Number of nodes inserted: " + string(passedCount.Load()))
-	}
 }
 
 func (n *TreeNode) Delete(id string) {
@@ -138,37 +121,30 @@ func (n *TreeNode) Delete(id string) {
 		n.NW.Delete(id)
 		n.SE.Delete(id)
 		n.SW.Delete(id)
+		return
 	}
 
 	n.mu.Lock()
-	for i, location := range n.Objects {
-		if location.Id == id {
-			if i >= 0 && i < len(n.Objects) {
-				n.Objects = append(n.Objects[:i], n.Objects[i+1:]...)
-			}
-		}
-	}
+	delete(n.Objects, id)
 	n.mu.Unlock()
 }
 
 func (n *TreeNode) divide() {
 	n.NE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-
 	n.NW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
-
 	n.SE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-
 	n.SW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 
 	n.mu.Lock()
 	for i, location := range n.Objects {
 		if location == nil {
-			panic("The Node is holding nil location. weird don't you think?. Location index: " + strconv.Itoa(i))
+			panic("The Node is holding nil location. weird don't you think?. Location index: " + i)
 		}
 		n.insertIntoChildren(location)
 	}
 
-	n.Objects = []*Location{}
+	// TODO: I want to set Objects as nil but some test fail, maybe running to fast in a concurrent manner. Fix this so we don't waste memory
+	n.Objects = map[string]*Location{}
 	n.IsDivided = true
 	n.mu.Unlock()
 }
@@ -177,27 +153,58 @@ func (q *QuadTree) reBalance() {
 	// TODO: Implement rebalancing
 }
 
+func rectangleOverlap(lat1 float64, lat2 float64, lon1 float64, lon2 float64, lat3 float64, lat4 float64, lon3 float64, lon4 float64) bool {
+	return math.Max(lat1, lat3) < math.Min(lat2, lat4) && math.Max(lon1, lon3) < math.Min(lon2, lon4)
+}
+
 func (n *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 float64) []*Location {
+
 	var locations []*Location
 
-	if n.Lon1 > lon2 || n.Lon2 < lon1 || n.Lat1 > lat2 || n.Lat2 < lat1 {
+	if !rectangleOverlap(n.Lat1, n.Lat2, n.Lon1, n.Lon2, lat1, lat2, lon1, lon2) {
 		return locations
 	}
 
-	if n.IsDivided {
-		locations = append(locations, n.NE.QueryRange(lat1, lat2, lon1, lon2)...)
-		locations = append(locations, n.NW.QueryRange(lat1, lat2, lon1, lon2)...)
-		locations = append(locations, n.SE.QueryRange(lat1, lat2, lon1, lon2)...)
-		locations = append(locations, n.SW.QueryRange(lat1, lat2, lon1, lon2)...)
+	if !n.IsDivided {
 
-		return locations
-	}
-
-	for _, location := range n.Objects {
-		if location.Lon >= lon1 && location.Lon <= lon2 && location.Lat >= lat1 && location.Lat <= lat2 {
-			locations = append(locations, location)
+		for _, location := range n.Objects {
+			if location.Lon() >= lon1 && location.Lon() <= lon2 && location.Lat() >= lat1 && location.Lat() <= lat2 {
+				locations = append(locations, location)
+			}
 		}
+
+		return locations
+	}
+
+	if rectangleOverlap(n.NE.Lat1, n.NE.Lat2, n.NE.Lon1, n.NE.Lon2, lat1, lat2, lon1, lon2) {
+		locations = append(locations, n.NE.QueryRange(lat1, lat2, lon1, lon2)...)
+	}
+
+	if rectangleOverlap(n.NW.Lat1, n.NW.Lat2, n.NW.Lon1, n.NW.Lon2, lat1, lat2, lon1, lon2) {
+		locations = append(locations, n.NW.QueryRange(lat1, lat2, lon1, lon2)...)
+	}
+
+	if rectangleOverlap(n.SE.Lat1, n.SE.Lat2, n.SE.Lon1, n.SE.Lon2, lat1, lat2, lon1, lon2) {
+		locations = append(locations, n.SE.QueryRange(lat1, lat2, lon1, lon2)...)
+	}
+
+	if rectangleOverlap(n.SW.Lat1, n.SW.Lat2, n.SW.Lon1, n.SW.Lon2, lat1, lat2, lon1, lon2) {
+		locations = append(locations, n.SW.QueryRange(lat1, lat2, lon1, lon2)...)
 	}
 
 	return locations
+}
+
+func (n *TreeNode) ForceDivide(level int) {
+	if level == 0 {
+		return
+	}
+
+	n.divide()
+	level--
+
+	n.NE.ForceDivide(level)
+	n.NW.ForceDivide(level)
+	n.SE.ForceDivide(level)
+	n.SW.ForceDivide(level)
 }

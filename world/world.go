@@ -18,7 +18,8 @@ type Stats struct {
 }
 
 type World struct {
-	namespaces *sync.Map
+	namespaces map[string]*Namespace
+	mu         sync.RWMutex
 }
 
 func init() {
@@ -28,7 +29,8 @@ func init() {
 
 func NewWorld() *World {
 	return &World{
-		namespaces: &sync.Map{},
+		namespaces: map[string]*Namespace{},
+		mu:         sync.RWMutex{},
 	}
 }
 
@@ -39,9 +41,10 @@ func (m *World) Delete(ns string, locId string) {
 		return
 	}
 
-	namespace.Delete(locId)
+	namespace.DeleteLocation(locId)
 }
 
+// Save a location to the world. If the location already exists, it will be updated.
 func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 	namespace := m.getNamespace(ns)
 
@@ -49,37 +52,40 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 		return NamespaceErrorNotFound
 	}
 
-	location, err := NewLocation(ns, locId, lat, lon)
+	var location *Location
+	err := error(nil)
 
-	if err != nil {
-		return err
+	location, ok := namespace.GetLocation(locId)
+
+	if ok {
+		err := location.Update(lat, lon)
+		if err != nil {
+			return err
+		}
+
+		// TODO: Update the tree
+
+		return nil
 	}
 
-	namespace.locations.Store(locId, location)
-	err = namespace.tree.Insert(location)
-	if err != nil {
-		return err
-	}
+	location, err = namespace.SaveLocation(locId, lat, lon)
 
-	return nil
+	return err
 }
 
 func (m *World) getNamespace(ns string) *Namespace {
-	_, ok := m.namespaces.Load(ns)
+	m.mu.Lock()
+	namespace, ok := m.namespaces[ns]
+	m.mu.Unlock()
 
 	if !ok {
-		newNamespace := NewNamespace(ns)
-
-		m.namespaces.Store(ns, newNamespace)
+		namespace = NewNamespace(ns)
+		m.mu.Lock()
+		m.namespaces[ns] = namespace
+		m.mu.Unlock()
 	}
 
-	namespace, ok := m.namespaces.Load(ns)
-
-	if !ok {
-		panic("sync.Map is not saving data")
-	}
-
-	return namespace.(*Namespace)
+	return namespace
 }
 
 func (m *World) ToBytes() []byte {
@@ -110,11 +116,16 @@ func NewWorldFromBytes(buf []byte) *World {
 }
 
 func (m *World) Merge(w *World) {
-	w.namespaces.Range(func(key, ns interface{}) bool {
-		m.namespaces.Store(key, ns)
-		return true
-
-	})
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	for ns, n := range w.namespaces {
+		for locId, loc := range n.locations {
+			err := m.Save(ns, locId, loc.Lat(), loc.Lon())
+			if err != nil {
+				log.Fatal("Error merging world: ", err)
+			}
+		}
+	}
 }
 
 func (m *World) GetLocation(ns string, id string) (Location, bool) {
@@ -124,8 +135,7 @@ func (m *World) GetLocation(ns string, id string) (Location, bool) {
 		return Location{}, false
 	}
 
-	entry, ok := namespace.locations.Load(id)
-	location, ok := entry.(*Location)
+	location, ok := namespace.GetLocation(id)
 	if !ok {
 		return Location{}, false
 	}

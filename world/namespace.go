@@ -11,21 +11,18 @@ func init() {
 
 type Namespace struct {
 	Name      string
-	locations sync.Map
+	locations map[string]*Location
 	tree      *QuadTree
+	mu        sync.RWMutex
 }
 
 func NewNamespace(name string) *Namespace {
 	return &Namespace{
 		Name:      name,
-		locations: sync.Map{},
+		locations: map[string]*Location{},
 		tree:      NewQuadTree(-90, 90, -180, 180),
+		mu:        sync.RWMutex{},
 	}
-}
-
-func (n *Namespace) Delete(id string) {
-	n.locations.Delete(id)
-	n.tree.Root.Delete(id)
 }
 
 func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location, error) {
@@ -35,7 +32,10 @@ func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location
 		return nil, err
 	}
 
-	n.locations.Store(id, loc)
+	n.mu.Lock()
+	n.locations[id] = loc
+	n.mu.Unlock()
+
 	err = n.tree.Insert(loc)
 	if err != nil {
 		return nil, err
@@ -45,15 +45,19 @@ func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location
 }
 
 func (n *Namespace) DeleteLocation(id string) {
-	n.locations.Delete(id)
+	n.mu.Lock()
+	delete(n.locations, id)
+	n.mu.Unlock()
+
+	n.tree.Root.Delete(id)
 }
 
 func (n *Namespace) GetLocation(id string) (*Location, bool) {
-	loc, found := n.locations.Load(id)
-	if !found {
-		return nil, false
-	}
-	return loc.(*Location), found
+	n.mu.RLock()
+	defer n.mu.RUnlock()
+	loc, ok := n.locations[id]
+
+	return loc, ok
 }
 
 func (n *Namespace) QueryRange(lat1, lat2, lon1, lon2 float64) []*Location {

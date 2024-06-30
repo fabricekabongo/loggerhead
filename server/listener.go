@@ -73,13 +73,12 @@ func (h *Handler) listen(listener net.Listener) {
 }
 
 func (h *Handler) handleConnection(conn net.Conn) error {
-	log.Println("New connection from: ", conn.RemoteAddr())
-
 	defer func(conn net.Conn) {
 		log.Println("Closing connection from: ", conn.RemoteAddr())
 		err := conn.Close()
 		if err != nil {
 			log.Println("Error closing connection: ", err)
+			return
 		}
 	}(conn)
 
@@ -98,6 +97,7 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 				startOfEOF = time.Now()
 			} else {
 				if time.Since(startOfEOF) > h.maxEOFWait {
+					log.Println("Connection timed out. Closing connection")
 					return nil
 				}
 			}

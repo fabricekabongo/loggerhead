@@ -8,6 +8,7 @@
 - [ ] Implement storing and recovering state from disk
 - [ ] Maybe implement consistency of data between nodes
 - [ ] Maybe implement load balancing and sharding
+- [ ] Offer UDP support for the network interface
 - [X] Connect the query language to the database
 - [X] Connect the network interface to the database through the query processor
 - [X] Implement the memory storage using a quadtree

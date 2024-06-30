@@ -143,7 +143,7 @@ func (n *TreeNode) divide() {
 		n.insertIntoChildren(location)
 	}
 
-	n.Objects = nil
+	n.Objects = map[string]*Location{}
 	n.IsDivided = true
 	n.mu.Unlock()
 }

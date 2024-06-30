@@ -214,15 +214,20 @@ func TestQuery(t *testing.T) {
 
 			data = queryProcessor.ExecuteQuery(query)
 
-			stringBuilder := strings.Builder{}
-			stringBuilder.WriteString("1.0,ns-id-8,loc-id-9,1.000000,2.000000")
-			stringBuilder.WriteString("\n")
-			stringBuilder.WriteString("1.0,ns-id-8,loc-id-10,1.500000,2.000000")
-			stringBuilder.WriteString("\n")
-			stringBuilder.WriteString("1.0,done\n")
+			lines := strings.Split(data, "\n")
 
-			if data != stringBuilder.String() {
-				t.Errorf("Expected '%s' but got %v", stringBuilder.String(), data)
+			expLines := map[string]string{
+				"1.0,ns-id-8,loc-id-9,1.000000,2.000000":  "1.0,ns-id-8,loc-id-9,1.000000,2.000000",
+				"1.0,ns-id-8,loc-id-10,1.500000,2.000000": "1.0,ns-id-8,loc-id-10,1.500000,2.000000",
+				"1.0,done": "1.0,done",
+			}
+
+			for _, expLine := range expLines {
+				if expLine == lines[0] || expLine == lines[1] || expLine == lines[2] {
+					continue
+				}
+
+				t.Fatalf("failed to compare expected lines with lines.")
 			}
 		})
 

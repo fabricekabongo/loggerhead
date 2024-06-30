@@ -24,6 +24,7 @@ type Location struct {
 	lon       float64
 	ns        string
 	updatedAt time.Time
+	Node      *TreeNode
 }
 
 func NewLocation(ns string, id string, lat float64, lon float64) (*Location, error) {

@@ -3,7 +3,6 @@ package world
 import (
 	"errors"
 	"math"
-	"strconv"
 	"sync"
 )
 
@@ -26,7 +25,7 @@ type TreeNode struct {
 	Lon1      float64
 	Lon2      float64
 	mu        sync.RWMutex
-	Objects   []*Location
+	Objects   map[string]*Location
 	Capacity  int
 	IsDivided bool
 }
@@ -40,6 +39,7 @@ func NewQuadTree(lat1 float64, lat2 float64, lon1 float64, lon2 float64) *QuadTr
 			Lat2:      lat2,
 			Lon1:      lon1,
 			Lon2:      lon2,
+			Objects:   make(map[string]*Location),
 		},
 	}
 
@@ -63,7 +63,7 @@ func NewTreeNode(lat1 float64, lat2 float64, lon1 float64, lon2 float64, capacit
 		Lat2:      lat2,
 		Lon1:      lon1,
 		Lon2:      lon2,
-		Objects:   []*Location{},
+		Objects:   make(map[string]*Location),
 	}
 }
 
@@ -72,7 +72,7 @@ func (n *TreeNode) insert(location *Location) error {
 		panic("Location is nil. It should never reach this point")
 	}
 	// If the location is not within the bound, return
-	if !(n.Lon1 <= location.lon && location.lon < n.Lon2 && n.Lat1 <= location.lat && location.lat < n.Lat2) {
+	if !(n.Lon1 <= location.lon && location.lon <= n.Lon2 && n.Lat1 <= location.lat && location.lat <= n.Lat2) {
 		return TreeErrLocationOutOfBounds
 	}
 
@@ -88,11 +88,17 @@ func (n *TreeNode) insert(location *Location) error {
 				}
 			}
 		}
+
+		return nil
 	}
 
 	// If the node is not divided, insert the location into the node
 	n.mu.Lock()
-	n.Objects = append(n.Objects, location)
+	if location.Node != nil && location.Node != n {
+		location.Node.Delete(location.Id())
+	}
+	n.Objects[location.Id()] = location
+	location.Node = n
 	n.mu.Unlock()
 
 	if len(n.Objects) > n.Capacity {
@@ -119,13 +125,7 @@ func (n *TreeNode) Delete(id string) {
 	}
 
 	n.mu.Lock()
-	for i, location := range n.Objects {
-		if location.Id() == id {
-			if i >= 0 && i < len(n.Objects) {
-				n.Objects = append(n.Objects[:i], n.Objects[i+1:]...)
-			}
-		}
-	}
+	delete(n.Objects, id)
 	n.mu.Unlock()
 }
 
@@ -138,12 +138,12 @@ func (n *TreeNode) divide() {
 	n.mu.Lock()
 	for i, location := range n.Objects {
 		if location == nil {
-			panic("The Node is holding nil location. weird don't you think?. Location index: " + strconv.Itoa(i))
+			panic("The Node is holding nil location. weird don't you think?. Location index: " + i)
 		}
 		n.insertIntoChildren(location)
 	}
 
-	n.Objects = []*Location{}
+	n.Objects = nil
 	n.IsDivided = true
 	n.mu.Unlock()
 }

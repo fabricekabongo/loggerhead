@@ -87,7 +87,6 @@ func TestWorld(t *testing.T) {
 			locations := world.QueryRange("ns", 1.0001, 1.0006, 1.0001, 1.0006)
 
 			if len(locations) != 2 {
-				t.Logf("Locations: %v", locations)
 				t.Fatalf("Expected 2 locations to be returned, got %v locations", len(locations))
 			}
 		})

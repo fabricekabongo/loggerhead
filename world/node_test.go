@@ -64,22 +64,22 @@ func TestNode(t *testing.T) {
 
 func createTestNode(t *testing.T) *TreeNode {
 	node := &TreeNode{
-		Objects: []*Location{},
+		Objects: make(map[string]*Location, 0),
 	}
 	loc, err := NewLocation("ns", "locId", 1.0, 1.0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	node.Objects = append(node.Objects, loc)
+	node.Objects[loc.Id()] = loc
 	loc, err = NewLocation("ns", "locId2", 2.0, 2.0)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	node.Objects = append(node.Objects, loc)
+	node.Objects[loc.Id()] = loc
 	loc, err = NewLocation("ns", "locId3", 2.0, 2.2)
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	node.Objects = append(node.Objects, loc)
+	node.Objects[loc.Id()] = loc
 	return node
 }

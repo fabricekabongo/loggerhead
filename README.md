@@ -6,7 +6,7 @@
 
 ### TODO
 
-- [ ] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
+- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
 - [ ] Improve the usage of Prometheus. Planned for `0.0.2`
 - [ ] Implement subscription to Polygon's updates. Planned for `0.0.3`
 - [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.4`

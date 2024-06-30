@@ -143,6 +143,7 @@ func (n *TreeNode) divide() {
 		n.insertIntoChildren(location)
 	}
 
+	// TODO: I want to set Objects as nil but some test fail, maybe running to fast in a concurrent manner. Fix this so we don't waste memory
 	n.Objects = map[string]*Location{}
 	n.IsDivided = true
 	n.mu.Unlock()

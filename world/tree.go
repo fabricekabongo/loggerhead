@@ -114,14 +114,6 @@ func (n *TreeNode) insert(location *Location) error {
 }
 
 func (n *TreeNode) Delete(id string) {
-	if n.IsDivided {
-		n.NE.Delete(id)
-		n.NW.Delete(id)
-		n.SE.Delete(id)
-		n.SW.Delete(id)
-		return
-	}
-
 	n.mu.Lock()
 	delete(n.Objects, id)
 	n.mu.Unlock()

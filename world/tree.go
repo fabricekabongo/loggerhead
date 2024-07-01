@@ -2,6 +2,8 @@ package world
 
 import (
 	"errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"math"
 	"sync"
 )
@@ -9,6 +11,10 @@ import (
 var (
 	TreeErrLocationNil         = errors.New("insertion failed because location is nil")
 	TreeErrLocationOutOfBounds = errors.New("insertion failed because location is out of bounds")
+	treeDivision               = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_world_tree_division",
+		Help: "The number of time the tree divides itself",
+	})
 )
 
 type QuadTree struct {
@@ -130,6 +136,7 @@ func (n *TreeNode) Delete(id string) {
 }
 
 func (n *TreeNode) divide() {
+	defer treeDivision.Inc()
 	n.NE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
 	n.NW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 	n.SE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)

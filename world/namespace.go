@@ -26,17 +26,24 @@ func NewNamespace(name string) *Namespace {
 }
 
 func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location, error) {
-
-	loc, err := NewLocation(n.Name, id, lat, lon)
-	if err != nil {
-		return nil, err
+	loc, ok := n.locations[id]
+	if ok {
+		err := loc.Update(lat, lon)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		newLoc, err := NewLocation(n.Name, id, lat, lon)
+		if err != nil {
+			return nil, err
+		}
+		loc = newLoc
+		n.mu.Lock()
+		n.locations[id] = loc
+		n.mu.Unlock()
 	}
 
-	n.mu.Lock()
-	n.locations[id] = loc
-	n.mu.Unlock()
-
-	err = n.tree.Insert(loc)
+	err := n.tree.Insert(loc)
 	if err != nil {
 		return nil, err
 	}
@@ -46,10 +53,17 @@ func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location
 
 func (n *Namespace) DeleteLocation(id string) {
 	n.mu.Lock()
+	loc, ok := n.locations[id]
+	if !ok {
+		return
+	}
+
+	if loc.Node != nil {
+		loc.Node.Delete(loc.Id())
+	}
+
 	delete(n.locations, id)
 	n.mu.Unlock()
-
-	n.tree.Root.Delete(id)
 }
 
 func (n *Namespace) GetLocation(id string) (*Location, bool) {

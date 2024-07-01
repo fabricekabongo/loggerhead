@@ -6,15 +6,15 @@
 
 ### TODO
 
-- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
-- [ ] Improve the usage of Prometheus. Planned for `0.0.2`
-- [ ] Implement subscription to Polygon's updates. Planned for `0.0.3`
-- [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.4`
+- [X] Improve the usage of Prometheus. Planned for `0.0.3`
+- [ ] Implement subscription to Polygon's updates. Planned for `0.0.4`
+- [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.5`
 - [ ] Offer the ability to enable RAFT for a cluster instead of just Gossip for consistency between nodes (slower). Planned for `0.1.0`
 - [ ] Offer the ability to shard namespaces by TreeNodes with primary and replication across nodes (basically multiple RAFT running in parallel) `0.2.0`
 - [ ] Implement storing and recovering state from disk. Planned for `0.3.0`
 
 ### Done
+- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
 - [X] Connect the query language to the database
 - [X] Connect the network interface to the database through the query processor
 - [X] Implement the memory storage using a quadtree

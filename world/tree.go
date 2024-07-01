@@ -129,25 +129,27 @@ func (n *TreeNode) Delete(id string) {
 
 func (n *TreeNode) divide() {
 	defer treeDivision.Inc()
-	n.NE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-	n.NW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
-	n.SE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-	n.SW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
+	n.SE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
+	n.SW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
+	n.NE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
+	n.NW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 
+	n.IsDivided = true
 	n.mu.Lock()
 	for i, location := range n.Objects {
 		if location == nil {
 			panic("The Node is holding nil location. weird don't you think?. Location index: " + i)
 		}
-		err := n.insert(location)
-		if err != nil {
-			continue
-		}
+		delete(n.Objects, location.Id())
+		location.Node = nil
+
+		_ = n.insert(location)
 	}
+	n.mu.Unlock()
 
 	// TODO: I want to set Objects as nil but some test fail, maybe running to fast in a concurrent manner. Fix this so we don't waste memory
+	n.mu.Lock()
 	n.Objects = map[string]*Location{}
-	n.IsDivided = true
 	n.mu.Unlock()
 }
 

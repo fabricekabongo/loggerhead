@@ -83,7 +83,6 @@ func (n *TreeNode) insert(location *Location) error {
 	}
 
 	if n.IsDivided {
-
 		err := n.NW.insert(location)
 		if err != nil {
 			err = n.NE.insert(location)
@@ -114,13 +113,6 @@ func (n *TreeNode) insert(location *Location) error {
 	return nil
 }
 
-func (n *TreeNode) insertIntoChildren(location *Location) {
-	if location == nil {
-		panic("Location is nil. It should never reach this point")
-	}
-
-}
-
 func (n *TreeNode) Delete(id string) {
 	if n.IsDivided {
 		n.NE.Delete(id)
@@ -147,7 +139,10 @@ func (n *TreeNode) divide() {
 		if location == nil {
 			panic("The Node is holding nil location. weird don't you think?. Location index: " + i)
 		}
-		n.insertIntoChildren(location)
+		err := n.insert(location)
+		if err != nil {
+			continue
+		}
 	}
 
 	// TODO: I want to set Objects as nil but some test fail, maybe running to fast in a concurrent manner. Fix this so we don't waste memory

@@ -53,9 +53,6 @@ func main() {
 
 	svr := server.NewServer([]*server.Listener{writer, reader})
 
-	end := time.Now()
-	fmt.Println("Startup time: ", end.Sub(start))
-
 	defer svr.Stop()
 
 	printWelcomeMessage(cfg, cluster)
@@ -77,6 +74,8 @@ func main() {
 		os.Exit(0)
 	}()
 
+	end := time.Now()
+	fmt.Println("Startup time: ", end.Sub(start))
 	svr.Start()
 
 	return
@@ -89,6 +88,7 @@ func printWelcomeMessage(cfg config.Config, cluster *clustering.Cluster) {
 	fmt.Println("Read Port: ", cfg.ReadPort)
 	fmt.Println("Write Port: ", cfg.WritePort)
 	fmt.Println("Cluster Port: ", cfg.ClusterPort)
+	fmt.Println("Admin & Prometheus Port:", cfg.HttpPort)
 	fmt.Println("Max Connections: ", cfg.MaxConnections)
 	fmt.Println("Max EOF Wait: ", cfg.MaxEOFWait)
 	fmt.Println("Cluster DNS: ", cfg.ClusterDNS)

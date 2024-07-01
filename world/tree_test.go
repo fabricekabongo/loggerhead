@@ -1,6 +1,9 @@
 package world
 
-import "testing"
+import (
+	"github.com/stretchr/testify/assert"
+	"testing"
+)
 
 func TestTree(t *testing.T) {
 	t.Parallel()
@@ -10,22 +13,21 @@ func TestTree(t *testing.T) {
 			t.Parallel()
 			tree := NewQuadTree(-90, 90, -180, 180)
 			loc, err := NewLocation("ns", "locId", 1.0, 1.0)
-			if err != nil {
-				t.Fatalf("Unexpected error: %v", err)
-			}
+			assert.ErrorIs(t, err, nil)
 
 			err = tree.Insert(loc)
-			if err != nil {
-				t.Fatalf("Error inserting location: %v", err)
-			}
+			assert.ErrorIs(t, err, nil)
+			assert.NotNil(t, loc.Node)
 
 			tree.Root.Delete("locId")
 
 			locations := tree.Root.QueryRange(-90, 90, -180, 180)
 
-			if len(locations) != 0 {
-				t.Fatalf("Expected 0 locations to be returned, got %v locations", len(locations))
-			}
+			assert.Len(t, locations, 1, "Delete was cascaded, which we don't want as it is slow")
+
+			loc.Node.Delete("locId")
+			locations = tree.Root.QueryRange(-90, 90, -180, 180)
+			assert.Len(t, locations, 0)
 		})
 
 		t.Run("Should not panic if location not found", func(t *testing.T) {

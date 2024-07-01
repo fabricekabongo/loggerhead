@@ -2,6 +2,8 @@ package world
 
 import (
 	"errors"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"math"
 	"sync"
 )
@@ -9,6 +11,10 @@ import (
 var (
 	TreeErrLocationNil         = errors.New("insertion failed because location is nil")
 	TreeErrLocationOutOfBounds = errors.New("insertion failed because location is out of bounds")
+	treeDivision               = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_world_tree_division",
+		Help: "The number of time the tree divides itself",
+	})
 )
 
 type QuadTree struct {
@@ -77,7 +83,6 @@ func (n *TreeNode) insert(location *Location) error {
 	}
 
 	if n.IsDivided {
-
 		err := n.NW.insert(location)
 		if err != nil {
 			err = n.NE.insert(location)
@@ -108,44 +113,35 @@ func (n *TreeNode) insert(location *Location) error {
 	return nil
 }
 
-func (n *TreeNode) insertIntoChildren(location *Location) {
-	if location == nil {
-		panic("Location is nil. It should never reach this point")
-	}
-
-}
-
 func (n *TreeNode) Delete(id string) {
-	if n.IsDivided {
-		n.NE.Delete(id)
-		n.NW.Delete(id)
-		n.SE.Delete(id)
-		n.SW.Delete(id)
-		return
-	}
-
 	n.mu.Lock()
 	delete(n.Objects, id)
 	n.mu.Unlock()
 }
 
 func (n *TreeNode) divide() {
-	n.NE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-	n.NW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
-	n.SE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
-	n.SW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
+	defer treeDivision.Inc()
+	n.SE = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
+	n.SW = NewTreeNode(n.Lat1, (n.Lat1+n.Lat2)/2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
+	n.NE = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, (n.Lon1+n.Lon2)/2, n.Lon2, n.Capacity)
+	n.NW = NewTreeNode((n.Lat1+n.Lat2)/2, n.Lat2, n.Lon1, (n.Lon1+n.Lon2)/2, n.Capacity)
 
+	n.IsDivided = true
 	n.mu.Lock()
 	for i, location := range n.Objects {
 		if location == nil {
 			panic("The Node is holding nil location. weird don't you think?. Location index: " + i)
 		}
-		n.insertIntoChildren(location)
+		delete(n.Objects, location.Id())
+		location.Node = nil
+
+		_ = n.insert(location)
 	}
+	n.mu.Unlock()
 
 	// TODO: I want to set Objects as nil but some test fail, maybe running to fast in a concurrent manner. Fix this so we don't waste memory
+	n.mu.Lock()
 	n.Objects = map[string]*Location{}
-	n.IsDivided = true
 	n.mu.Unlock()
 }
 

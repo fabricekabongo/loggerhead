@@ -42,7 +42,6 @@ func NewOpsServer(cluster *clustering.Cluster, cfg config.Config) *OpsServer {
 }
 
 func (o *OpsServer) Start() {
-
 	http.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(StaticFS))))
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/admin-data", o.AdminData())
@@ -52,7 +51,6 @@ func (o *OpsServer) Start() {
 		log.Println("Failed to start the admin server: ", err)
 		return
 	}
-
 }
 
 type Data struct {

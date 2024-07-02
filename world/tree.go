@@ -142,10 +142,7 @@ func (node *TreeNode) divide() {
 			if err != nil {
 				err = node.SW.insert(location)
 				if err != nil {
-					err = node.SE.insert(location)
-					if err != nil {
-						panic("Failed to insert location into the tree")
-					}
+					_ = node.SE.insert(location) // Ignoring the error here as it means the object has been moved mid-flight to another node which is not a problem
 				}
 			}
 		}

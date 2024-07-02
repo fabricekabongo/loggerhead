@@ -78,9 +78,9 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 }
 
 func (m *World) getNamespace(ns string) *Namespace {
-	m.mu.Lock()
+	m.mu.RLock()
 	namespace, ok := m.namespaces[ns]
-	m.mu.Unlock()
+	m.mu.RUnlock()
 
 	if !ok {
 		namespace = NewNamespace(ns)

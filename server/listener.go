@@ -15,11 +15,6 @@ var (
 		Name: "loggerhead_server_connections",
 		Help: "Total connections",
 	})
-	requestDuration = promauto.NewHistogram(prometheus.HistogramOpts{
-		Name:    "loggerhead_server_request_duration",
-		Help:    "Request duration",
-		Buckets: prometheus.DefBuckets,
-	})
 )
 
 type Handler struct {
@@ -127,13 +122,9 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 			break
 		}
 
-		start := time.Now()
 		var response string
 		response = h.QueryEngine.ExecuteQuery(line)
 		_, err := conn.Write([]byte(response))
-		end := time.Since(start)
-
-		requestDuration.Observe(float64(end.Milliseconds()))
 
 		if err != nil {
 			log.Println("Error writing to connection: ", err)

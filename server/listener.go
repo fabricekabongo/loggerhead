@@ -3,9 +3,18 @@ package server
 import (
 	"bufio"
 	"github.com/fabricekabongo/loggerhead/query"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"log"
 	"net"
 	"time"
+)
+
+var (
+	connectionGauge = promauto.NewGauge(prometheus.GaugeOpts{
+		Name: "loggerhead_server_connections",
+		Help: "Total connections",
+	})
 )
 
 type Handler struct {
@@ -73,7 +82,9 @@ func (h *Handler) listen(listener net.Listener) {
 }
 
 func (h *Handler) handleConnection(conn net.Conn) error {
+	connectionGauge.Inc()
 	defer func(conn net.Conn) {
+		defer connectionGauge.Dec()
 		log.Println("Closing connection from: ", conn.RemoteAddr())
 		err := conn.Close()
 		if err != nil {
@@ -114,11 +125,11 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 		var response string
 		response = h.QueryEngine.ExecuteQuery(line)
 		_, err := conn.Write([]byte(response))
+
 		if err != nil {
 			log.Println("Error writing to connection: ", err)
 			return err
 		}
-
 	}
 
 	return nil

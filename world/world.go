@@ -52,31 +52,15 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 		return NamespaceErrorNotFound
 	}
 
-	var location *Location
-	err := error(nil)
-
-	location, ok := namespace.GetLocation(locId)
-
-	if ok {
-		err := location.Update(lat, lon)
-		if err != nil {
-			return err
-		}
-
-		// TODO: Update the tree
-
-		return nil
-	}
-
-	location, err = namespace.SaveLocation(locId, lat, lon)
+	_, err := namespace.SaveLocation(locId, lat, lon)
 
 	return err
 }
 
 func (m *World) getNamespace(ns string) *Namespace {
-	m.mu.Lock()
+	m.mu.RLock()
 	namespace, ok := m.namespaces[ns]
-	m.mu.Unlock()
+	m.mu.RUnlock()
 
 	if !ok {
 		namespace = NewNamespace(ns)

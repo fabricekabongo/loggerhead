@@ -3,15 +3,102 @@ package query
 import (
 	"errors"
 	w "github.com/fabricekabongo/loggerhead/world"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"log"
+	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
 	ErrorInvalidQuery = errors.New("invalid query")
 	version           = "1.0"
+
+	SaveCounter  prometheus.Counter
+	SaveDuration prometheus.Histogram
+
+	DeleteCounter  prometheus.Counter
+	DeleteDuration prometheus.Histogram
+
+	PolyCounter  prometheus.Counter
+	PolyDuration prometheus.Histogram
+
+	GetCounter  prometheus.Counter
+	GetDuration prometheus.Histogram
 )
+
+func init() {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = "unknown"
+	}
+
+	SaveCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_query_save_total",
+		Help: "Total number of save queries",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	SaveDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "loggerhead_query_save_duration_nanoseconds",
+		Help: "Duration of save queries in nanoseconds",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	DeleteCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_query_delete_total",
+		Help: "Total number of delete queries",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	DeleteDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "loggerhead_query_delete_duration_nanoseconds",
+		Help: "Duration of delete queries in nanoseconds",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	PolyCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_query_query_total",
+		Help: "Total number of query queries",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	PolyDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "loggerhead_query_query_duration_nanoseconds",
+		Help: "Duration of query queries in nanoseconds",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	GetCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_query_get_total",
+		Help: "Total number of get queries",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+
+	GetDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name: "loggerhead_query_get_duration_nanoseconds",
+		Help: "Duration of get queries in nanoseconds",
+		ConstLabels: map[string]string{
+			"hostname": hostname,
+		},
+	})
+}
 
 type EngineInterface interface {
 	ExecuteQuery(query string) string
@@ -72,7 +159,7 @@ func (qp *Engine) ExecuteQuery(query string) string {
 
 	log.Println(ErrorInvalidQuery.Error(), query)
 
-	return "1.0,\"" + ErrorInvalidQuery.Error() + "\"\n"
+	return version + ",\"" + ErrorInvalidQuery.Error() + "\"\n"
 }
 
 type GetQueryProcessor struct {
@@ -81,6 +168,9 @@ type GetQueryProcessor struct {
 }
 
 func (p *GetQueryProcessor) Execute(query string) string {
+	defer GetCounter.Inc()
+	start := time.Now()
+
 	if p.World == nil {
 		panic("world is nil")
 	}
@@ -102,12 +192,15 @@ func (p *GetQueryProcessor) Execute(query string) string {
 	location, ok := p.World.GetLocation(namespaceID, locationID)
 
 	if !ok {
-		return "1.0,done\n"
+		return version + ",done\n"
 	}
 
 	stringBuilder := strings.Builder{}
-	stringBuilder.WriteString("1.0," + location.String() + "\n")
-	stringBuilder.WriteString("1.0,done\n")
+	stringBuilder.WriteString(version + "," + location.String() + "\n")
+	stringBuilder.WriteString(version + ",done\n")
+
+	elapsed := time.Since(start)
+	GetDuration.Observe(float64(elapsed.Nanoseconds()))
 
 	return stringBuilder.String()
 }
@@ -127,6 +220,8 @@ type DeleteQueryProcessor struct {
 }
 
 func (p *DeleteQueryProcessor) Execute(query string) string {
+	defer DeleteCounter.Inc()
+	start := time.Now()
 	if p.World == nil {
 		panic("world is nil")
 	}
@@ -147,7 +242,10 @@ func (p *DeleteQueryProcessor) Execute(query string) string {
 
 	p.World.Delete(namespaceID, locationID)
 
-	return "1.0,deleted\n"
+	elapsed := time.Since(start)
+	DeleteDuration.Observe(float64(elapsed.Nanoseconds()))
+
+	return version + ",deleted\n"
 }
 
 func (p *DeleteQueryProcessor) CanProcess(query string) bool {
@@ -164,6 +262,8 @@ type SaveQueryProcessor struct {
 }
 
 func (p *SaveQueryProcessor) Execute(query string) string {
+	defer SaveCounter.Inc()
+	start := time.Now()
 	if p.World == nil {
 		panic("world is nil")
 	}
@@ -186,20 +286,23 @@ func (p *SaveQueryProcessor) Execute(query string) string {
 
 	latFloat, err := strconv.ParseFloat(latitude, 64)
 	if err != nil {
-		return "1.0," + "\"Invalid float64 value for latitude\"\n"
+		return version + "," + "\"Invalid float64 value for latitude\"\n"
 	}
 
 	lonFloat, err := strconv.ParseFloat(longitude, 64)
 	if err != nil {
-		return "1.0," + "\"Invalid float64 value for longitude\"\n"
+		return version + "," + "\"Invalid float64 value for longitude\"\n"
 	}
 
 	err = p.World.Save(namespaceID, locationID, latFloat, lonFloat)
 	if err != nil {
-		return "1.0,\"" + err.Error() + "\"\n"
+		return version + ",\"" + err.Error() + "\"\n"
 	}
 
-	return "1.0,saved\n"
+	elapsed := time.Since(start)
+	SaveDuration.Observe(float64(elapsed.Nanoseconds()))
+
+	return version + ",saved\n"
 }
 
 func (p *SaveQueryProcessor) CanProcess(query string) bool {
@@ -216,6 +319,8 @@ type PolyQueryProcessor struct {
 }
 
 func (p *PolyQueryProcessor) Execute(query string) string {
+	defer PolyCounter.Inc()
+	start := time.Now()
 	if p.World == nil {
 		panic("world is nil")
 	}
@@ -234,19 +339,19 @@ func (p *PolyQueryProcessor) Execute(query string) string {
 	ns := chunks[1]
 	lat1, err := strconv.ParseFloat(chunks[2], 64)
 	if err != nil {
-		return "1.0," + "\"Invalid float64 value for latitude1\"\n"
+		return version + "," + "\"Invalid float64 value for latitude1\"\n"
 	}
 	lon1, err := strconv.ParseFloat(chunks[3], 64)
 	if err != nil {
-		return "1.0," + "\"Invalid float64 value for longitude1\"\n"
+		return version + "," + "\"Invalid float64 value for longitude1\"\n"
 	}
 	lat2, err := strconv.ParseFloat(chunks[4], 64)
 	if err != nil {
-		return "1.0," + "\"Invalid float64 value for latitude2\"\n"
+		return version + "," + "\"Invalid float64 value for latitude2\"\n"
 	}
 	lon2, err := strconv.ParseFloat(chunks[5], 64)
 	if err != nil {
-		return "1.0," + "\"Invalid float64 value for longitude2\"\n"
+		return version + "," + "\"Invalid float64 value for longitude2\"\n"
 	}
 
 	locations := p.World.QueryRange(ns, lat1, lat2, lon1, lon2)
@@ -254,10 +359,13 @@ func (p *PolyQueryProcessor) Execute(query string) string {
 	var result strings.Builder
 
 	for _, location := range locations {
-		result.WriteString("1.0," + location.String() + "\n")
+		result.WriteString(version + "," + location.String() + "\n")
 	}
 
-	result.WriteString("1.0,done\n")
+	result.WriteString(version + ",done\n")
+
+	elapsed := time.Since(start)
+	PolyDuration.Observe(float64(elapsed.Nanoseconds()))
 
 	return result.String()
 }

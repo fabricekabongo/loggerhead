@@ -109,7 +109,7 @@ func TestNamespace(t *testing.T) {
 
 		t.Run("should not error if location does not exist", func(t *testing.T) {
 			t.Parallel()
-			ns := NewNamespace("test")
+			ns := NewNamespace("test2")
 			ns.DeleteLocation("id")
 		})
 	})

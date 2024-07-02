@@ -4,6 +4,8 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"time"
 )
 
@@ -12,6 +14,10 @@ var (
 	LocationErrorInvalidLatitude   = errors.New("invalid latitude")
 	LocationErrorInvalidLongitude  = errors.New("invalid longitude")
 	LocationErrorRequiredNamespace = errors.New("namespace is required")
+	validationOps                  = promauto.NewCounter(prometheus.CounterOpts{
+		Name: "loggerhead_world_location_error",
+		Help: "Total failed location data validation",
+	})
 )
 
 func init() {
@@ -29,9 +35,11 @@ type Location struct {
 
 func NewLocation(ns string, id string, lat float64, lon float64) (*Location, error) {
 	if len(id) == 0 {
+		validationOps.Inc()
 		return nil, LocationErrorRequiredId
 	}
 	if len(ns) == 0 {
+		validationOps.Inc()
 		return nil, LocationErrorRequiredNamespace
 	}
 
@@ -52,9 +60,11 @@ func NewLocation(ns string, id string, lat float64, lon float64) (*Location, err
 
 func (l *Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
 	if len(id) == 0 {
+		validationOps.Inc()
 		return nil, LocationErrorRequiredId
 	}
 	if len(ns) == 0 {
+		validationOps.Inc()
 		return nil, LocationErrorRequiredNamespace
 	}
 
@@ -90,10 +100,12 @@ func (l *Location) Update(lat float64, lon float64) error {
 func validateLatLon(lat float64, lon float64) error {
 
 	if lat < -90 || lat > 90 {
+		validationOps.Inc()
 		return LocationErrorInvalidLatitude
 	}
 
 	if lon < -180 || lon > 180 {
+		validationOps.Inc()
 		return LocationErrorInvalidLongitude
 	}
 

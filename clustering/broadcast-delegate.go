@@ -4,8 +4,35 @@ import (
 	"github.com/fabricekabongo/loggerhead/query"
 	"github.com/fabricekabongo/loggerhead/world"
 	"github.com/hashicorp/memberlist"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 	"log"
+	"os"
 )
+
+var (
+	LocalStateSharedCounter prometheus.Counter
+	MergeRemoteStateCounter prometheus.Counter
+)
+
+func init() {
+	name, err := os.Hostname()
+	if err != nil {
+		log.Println("Failed to get hostname")
+		name = "unknown"
+	}
+	LocalStateSharedCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name:        "loggerhead_clustering_local_state_shared",
+		Help:        "Local state shared with new node",
+		ConstLabels: map[string]string{"hostname": name},
+	})
+
+	MergeRemoteStateCounter = promauto.NewCounter(prometheus.CounterOpts{
+		Name:        "loggerhead_clustering_remote_state_merged",
+		Help:        "Remote state merged with local state",
+		ConstLabels: map[string]string{"hostname": name},
+	})
+}
 
 type BroadcastDelegate struct {
 	state      *NodeState
@@ -44,6 +71,7 @@ func (d *BroadcastDelegate) GetBroadcasts(overhead, limit int) [][]byte {
 }
 
 func (d *BroadcastDelegate) LocalState(join bool) []byte {
+	defer LocalStateSharedCounter.Inc()
 	if join {
 		log.Println("Sharing local state to a new node")
 		return d.state.engine.World().ToBytes()
@@ -53,6 +81,7 @@ func (d *BroadcastDelegate) LocalState(join bool) []byte {
 }
 
 func (d *BroadcastDelegate) MergeRemoteState(buf []byte, join bool) {
+	defer MergeRemoteStateCounter.Inc()
 	if join {
 		log.Println("Bootstrapping new node with remote state")
 		w := world.NewWorldFromBytes(buf)

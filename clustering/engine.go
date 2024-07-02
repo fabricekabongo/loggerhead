@@ -9,7 +9,9 @@ type EngineDecorator struct {
 }
 
 func (e EngineDecorator) ExecuteQuery(query string) string {
-	e.commandChan <- query
+	defer func() {
+		e.commandChan <- query
+	}() //Here I prioritize memory instead of the cluster broadcast as memory is faster than the network
 	return e.engine.ExecuteQuery(query)
 }
 

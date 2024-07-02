@@ -11,9 +11,14 @@ import (
 )
 
 var (
-	ConnectionGauge = promauto.NewGauge(prometheus.GaugeOpts{
+	connectionGauge = promauto.NewGauge(prometheus.GaugeOpts{
 		Name: "loggerhead_server_connections",
 		Help: "Total connections",
+	})
+	requestDuration = promauto.NewHistogram(prometheus.HistogramOpts{
+		Name:    "loggerhead_server_request_duration",
+		Help:    "Request duration",
+		Buckets: prometheus.DefBuckets,
 	})
 )
 
@@ -82,9 +87,9 @@ func (h *Handler) listen(listener net.Listener) {
 }
 
 func (h *Handler) handleConnection(conn net.Conn) error {
-	ConnectionGauge.Inc()
+	connectionGauge.Inc()
 	defer func(conn net.Conn) {
-		defer ConnectionGauge.Dec()
+		defer connectionGauge.Dec()
 		log.Println("Closing connection from: ", conn.RemoteAddr())
 		err := conn.Close()
 		if err != nil {
@@ -122,14 +127,18 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 			break
 		}
 
+		start := time.Now()
 		var response string
 		response = h.QueryEngine.ExecuteQuery(line)
 		_, err := conn.Write([]byte(response))
+		end := time.Since(start)
+
+		requestDuration.Observe(float64(end.Milliseconds()))
+
 		if err != nil {
 			log.Println("Error writing to connection: ", err)
 			return err
 		}
-
 	}
 
 	return nil

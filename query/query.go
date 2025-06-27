@@ -2,6 +2,7 @@ package query
 
 import (
 	"errors"
+	"github.com/fabricekabongo/loggerhead/subscription"
 	w "github.com/fabricekabongo/loggerhead/world"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
@@ -114,13 +115,13 @@ type Processor interface {
 	CanProcess(query string) bool
 }
 
-func NewQueryEngine(world *w.World) EngineInterface {
+func NewQueryEngine(world *w.World, subs *subscription.Manager) EngineInterface {
 	return &Engine{
 		world: world,
 		chain: []Processor{
 			&GetQueryProcessor{World: world},
 			&DeleteQueryProcessor{World: world},
-			&SaveQueryProcessor{World: world},
+			&SaveQueryProcessor{World: world, Subs: subs},
 			&PolyQueryProcessor{World: world},
 		},
 	}
@@ -136,11 +137,11 @@ func NewReadQueryEngine(world *w.World) EngineInterface {
 	}
 }
 
-func NewWriteQueryEngine(world *w.World) *Engine {
+func NewWriteQueryEngine(world *w.World, subs *subscription.Manager) *Engine {
 	return &Engine{
 		world: world,
 		chain: []Processor{
-			&SaveQueryProcessor{World: world},
+			&SaveQueryProcessor{World: world, Subs: subs},
 			&DeleteQueryProcessor{World: world},
 		},
 	}
@@ -259,6 +260,7 @@ func (p *DeleteQueryProcessor) CanProcess(query string) bool {
 
 type SaveQueryProcessor struct {
 	World *w.World
+	Subs  *subscription.Manager
 }
 
 func (p *SaveQueryProcessor) Execute(query string) string {
@@ -297,6 +299,12 @@ func (p *SaveQueryProcessor) Execute(query string) string {
 	err = p.World.Save(namespaceID, locationID, latFloat, lonFloat)
 	if err != nil {
 		return version + ",\"" + err.Error() + "\"\n"
+	}
+
+	if p.Subs != nil {
+		if loc, ok := p.World.GetLocation(namespaceID, locationID); ok {
+			go p.Subs.Notify(&loc)
+		}
 	}
 
 	elapsed := time.Since(start)

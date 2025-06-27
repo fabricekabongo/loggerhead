@@ -8,6 +8,7 @@ import (
 	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/fabricekabongo/loggerhead/query"
 	"github.com/fabricekabongo/loggerhead/server"
+	"github.com/fabricekabongo/loggerhead/subscription"
 	"github.com/fabricekabongo/loggerhead/world"
 	"log"
 	"os"
@@ -21,8 +22,9 @@ func main() {
 	cfg := config.GetConfig()
 
 	worldMap := world.NewWorld()
+	subs := subscription.NewManager()
 	readEngine := query.NewReadQueryEngine(worldMap)
-	writeEngine := query.NewWriteQueryEngine(worldMap)
+	writeEngine := query.NewWriteQueryEngine(worldMap, subs)
 	// subscriberEngine := query.NewSubscriberQueryEngine(worldMap)
 
 	cluster, err := clustering.NewCluster(writeEngine, cfg)
@@ -49,9 +51,9 @@ func main() {
 
 	writer := server.NewListener(cfg.WritePort, cfg.MaxConnections, cfg.MaxEOFWait, clusterEngine) // This is the writer listener (for writes and broadcasts)
 	reader := server.NewListener(cfg.ReadPort, cfg.MaxConnections, cfg.MaxEOFWait, readEngine)     // This is the reader listener (for reads).
-	// subscriber := server.NewListener(cfg, subscriberEngine)
+	subListener := server.NewSubscriptionListener(cfg.SubPort, cfg.MaxConnections, cfg.MaxEOFWait, worldMap, subs)
 
-	svr := server.NewServer([]*server.Listener{writer, reader})
+	svr := server.NewServer([]*server.Listener{writer, reader, subListener})
 
 	defer svr.Stop()
 

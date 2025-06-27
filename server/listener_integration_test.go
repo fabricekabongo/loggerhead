@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"github.com/ataul443/memnet"
 	"github.com/fabricekabongo/loggerhead/query"
+	"github.com/fabricekabongo/loggerhead/subscription"
 	"github.com/fabricekabongo/loggerhead/world"
 	"testing"
 	"time"
@@ -15,7 +16,7 @@ func TestListenerCRUDFlow(t *testing.T) {
 		t.Fatalf("Failed to create memnet listener: %v", err)
 	}
 	w := world.NewWorld()
-	engine := query.NewQueryEngine(w)
+	engine := query.NewQueryEngine(w, subscription.NewManager())
 	l := NewListener(19999, 10, time.Second, engine)
 
 	go l.Handler.listen(netListener)

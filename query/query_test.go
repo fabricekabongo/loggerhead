@@ -2,6 +2,7 @@ package query
 
 import (
 	"fmt"
+	"github.com/fabricekabongo/loggerhead/subscription"
 	w "github.com/fabricekabongo/loggerhead/world"
 	"math/rand/v2"
 	"strconv"
@@ -13,7 +14,7 @@ func TestQuery(t *testing.T) {
 	t.Run("Invalid Query", func(t *testing.T) {
 		t.Run("should return an error if the query is invalid", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := fmt.Sprintf("%s %s %s", strconv.Itoa(int(rand.Int32())), strconv.Itoa(int(rand.Int32())), strconv.Itoa(int(rand.Int32())))
 
@@ -32,7 +33,7 @@ func TestQuery(t *testing.T) {
 				t.Errorf("Error saving location: %v", err)
 			}
 
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "GET ns-id-8 loc-id-9"
 
@@ -45,7 +46,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should return an empty string if the result is empty", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "GET ns-id-8 loc-id-9"
 
@@ -64,7 +65,7 @@ func TestQuery(t *testing.T) {
 				t.Errorf("Error saving location: %v", err)
 			}
 
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "DELETE ns-id-8 loc-id-9"
 
@@ -84,7 +85,7 @@ func TestQuery(t *testing.T) {
 	t.Run("SaveQuery", func(t *testing.T) {
 		t.Run("should save a location to the world", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
@@ -105,7 +106,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should update a location in the world", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 
@@ -134,7 +135,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should return an error if the longitude is invalid", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 200.0"
 
@@ -154,7 +155,7 @@ func TestQuery(t *testing.T) {
 		})
 		t.Run("should return an error if the latitude is invalid", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "SAVE ns-id-8 loc-id-9 100 80"
 
@@ -174,7 +175,7 @@ func TestQuery(t *testing.T) {
 		})
 		t.Run("should return an error if location aren't floats", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "SAVE ns-id-8 loc-id-9 ina 90"
 
@@ -196,7 +197,7 @@ func TestQuery(t *testing.T) {
 	t.Run("POLY Query", func(t *testing.T) {
 		t.Run("should return a list of locations", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "SAVE ns-id-8 loc-id-9 1.0 2.0"
 			data := queryProcessor.ExecuteQuery(query)
@@ -233,7 +234,7 @@ func TestQuery(t *testing.T) {
 
 		t.Run("should return an empty string if the result is empty", func(t *testing.T) {
 			world := w.NewWorld()
-			queryProcessor := NewQueryEngine(world)
+			queryProcessor := NewQueryEngine(world, subscription.NewManager())
 
 			query := "POLY ns-id-8 0 0 2 2" // lat1 lon1 lat2 lon2
 

@@ -3,11 +3,13 @@ package server
 import (
 	"net"
 	"strconv"
+	"sync"
 )
 
 type Server struct {
 	listeners    []*Listener
 	closeChannel chan int
+	stopOnce     sync.Once
 }
 
 type ConnectionType string
@@ -32,12 +34,14 @@ func NewServer(listeners []*Listener) *Server {
 	return &Server{
 		listeners:    listeners,
 		closeChannel: make(chan int),
+		stopOnce:     sync.Once{},
 	}
 }
 
 func (s *Server) Stop() {
-	s.closeChannel <- 0
-	close(s.closeChannel)
+	s.stopOnce.Do(func() {
+		close(s.closeChannel)
+	})
 }
 
 func (s *Server) Start() {

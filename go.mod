@@ -1,7 +1,8 @@
 module github.com/fabricekabongo/loggerhead
 
-go 1.22.1
-toolchain go1.24.1
+go 1.23.0
+
+toolchain go1.24.3
 
 require (
 	github.com/ataul443/memnet v0.0.0-20200413031237-436d77c81cc8

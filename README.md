@@ -125,6 +125,16 @@ POLY mynamespace 10.560000 10.560000 15.560000 15.560000
 >> 1.0,done
 ```
 
+## SUBPOLY
+Connect to the subscription port (default 20001) and send:
+```shell
+telnet localhost 20001
+SUBPOLY mynamespace mysub true 10.0 10.0 15.0 15.0
+```
+If the `true` flag is provided, the current state of the polygon is sent first.
+After that, every move within the polygon will be streamed as
+`1.0,<subscription>,<namespace>,<id>,<lat>,<lon>`.
+
 ## Writing
 You will need to connect to port 19999 to write data to the database.
 

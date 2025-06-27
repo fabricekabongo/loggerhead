@@ -3,6 +3,7 @@ package server
 import (
 	"github.com/ataul443/memnet"
 	"github.com/fabricekabongo/loggerhead/query"
+	"github.com/fabricekabongo/loggerhead/subscription"
 	"github.com/fabricekabongo/loggerhead/world"
 	"math/rand/v2"
 	"strconv"
@@ -25,7 +26,7 @@ func BenchmarkListener(b *testing.B) {
 			b.Fatal("Failed to create a memnet listener: ", err)
 		}
 		w := world.NewWorld()
-		engine := query.NewQueryEngine(w)
+		engine := query.NewQueryEngine(w, subscription.NewManager())
 		l := NewListener(19999, 100, 20*time.Second, engine)
 
 		go l.Handler.listen(netListener)

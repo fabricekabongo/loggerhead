@@ -2,12 +2,13 @@ package server
 
 import (
 	"bufio"
-	"github.com/fabricekabongo/loggerhead/query"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"log"
 	"net"
 	"time"
+
+	"github.com/fabricekabongo/loggerhead/query"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -117,7 +118,7 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 		}
 		startOfEOF = time.Time{}
 		line := scanner.Text()
-		if len(line) == 0 {
+		if line == "" {
 			log.Println("Empty line received. Closing connection")
 			break
 		}

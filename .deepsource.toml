@@ -1,12 +1,6 @@
 version = 1
 
 [[analyzers]]
-name = "javascript"
-
-  [analyzers.meta]
-  environment = ["browser"]
-
-[[analyzers]]
 name = "docker"
 
   [analyzers.meta]

@@ -291,6 +291,7 @@ Loggerhead is still early, but there’s a clear path for where it’s going.
 * [ ] **Optional RAFT-based consistency** – enable a RAFT mode for stronger consistency within a cluster (trading some performance for guarantees). Planned for `0.1.0`.
 * [ ] **Sharding by namespace** – shard namespaces across TreeNodes with primary + replication (multiple RAFT groups in parallel). Planned for `0.2.0`.
 * [ ] **Durability** – store and recover state from disk. Planned for `0.3.0`.
+* [ ] **Tests for the Docker image**
 
 ### Already done
 

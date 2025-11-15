@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
-	"github.com/fabricekabongo/loggerhead/world"
 	"math/rand"
 	"net"
 	"strconv"
 	"sync/atomic"
 	"testing"
+
+	"github.com/fabricekabongo/loggerhead/world"
 )
 
 func CreateRandomLocation(seed int) (*world.Location, error) {
@@ -20,8 +21,7 @@ func CreateRandomLocation(seed int) (*world.Location, error) {
 }
 
 func BenchmarkDatabase(b *testing.B) {
-	var connPool map[int]net.Conn
-	connPool = make(map[int]net.Conn, 40)
+	var connPool map[int]net.Conn = make(map[int]net.Conn, 40)
 	for i := 0; i < 40; i++ {
 		conn, err := net.Dial("tcp", "localhost:19999")
 		if err != nil {

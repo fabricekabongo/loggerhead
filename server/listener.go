@@ -123,8 +123,7 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 			break
 		}
 
-		var response string
-		response = h.QueryEngine.ExecuteQuery(line)
+		var response string = h.QueryEngine.ExecuteQuery(line)
 		_, err := conn.Write([]byte(response))
 
 		if err != nil {

@@ -11,7 +11,7 @@
 ARG GO_VERSION=1.25.4-alpine
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 WORKDIR /src
-RUN apk add build-base
+RUN apk add build-base=0.5-r3
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /go/pkg/mod/ to speed up subsequent builds.
 # Leverage bind mounts to go.sum and go.mod to avoid having to copy them into

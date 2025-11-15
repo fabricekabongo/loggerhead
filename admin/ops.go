@@ -130,7 +130,7 @@ func (o *OpsServer) AdminData() http.Handler {
 }
 
 func (*OpsServer) AdminUI() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		err := TMPL.Execute(w, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

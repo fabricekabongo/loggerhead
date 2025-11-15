@@ -53,7 +53,7 @@ func newBroadcastDelegate(engine *query.Engine, broadcasts *memberlist.TransmitL
 	}
 }
 
-func (*BroadcastDelegate) NodeMeta(limit int) []byte {
+func (*BroadcastDelegate) NodeMeta(_ int) []byte {
 	return []byte{}
 }
 

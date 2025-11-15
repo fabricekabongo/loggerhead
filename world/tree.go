@@ -10,9 +10,7 @@ import (
 )
 
 var (
-	TreeErrLocationNil         = errors.New("insertion failed because location is nil")
-	TreeErrLocationOutOfBounds = errors.New("insertion failed because location is out of bounds")
-	treeDivision               = promauto.NewCounter(prometheus.CounterOpts{
+	treeDivision = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "loggerhead_world_tree_division",
 		Help: "The number of time the tree divides itself",
 	})
@@ -76,37 +74,37 @@ func NewTreeNode(lat1 float64, lat2 float64, lon1 float64, lon2 float64, capacit
 
 func (node *TreeNode) insert(location *Location) error {
 	if location == nil {
-		panic("Location is nil. It should never reach this point")
+		return TreeErrLocationNil
 	}
 	// If the location is not within the bound, return
 	if !(node.Lon1 <= location.lon && location.lon <= node.Lon2 && node.Lat1 <= location.lat && location.lat <= node.Lat2) {
 		return TreeErrLocationOutOfBounds
 	}
 
+	node.mu.Lock()
+	defer node.mu.Unlock()
+
 	if node.IsDivided {
 		err := node.NW.insert(location)
-		if err != nil {
+		if errors.Is(err, TreeErrLocationOutOfBounds) {
 			err = node.NE.insert(location)
-			if err != nil {
+			if errors.Is(err, TreeErrLocationOutOfBounds) {
 				err = node.SW.insert(location)
-				if err != nil {
+				if errors.Is(err, TreeErrLocationOutOfBounds) {
 					err = node.SE.insert(location)
 				}
 			}
 		}
 
-		return nil
+		return err
 	}
 
 	// If the node is not divided, insert the location into the node
 	if location.Node != nil && location.Node != node {
 		location.Node.Delete(location.Id())
 	}
-
-	node.mu.Lock()
 	node.Objects[location.Id()] = location
-	location.Node = node
-	node.mu.Unlock()
+	location.SetNode(node)
 
 	if len(node.Objects) > node.Capacity {
 		node.divide()
@@ -123,13 +121,19 @@ func (node *TreeNode) Delete(id string) {
 
 func (node *TreeNode) divide() {
 	defer treeDivision.Inc()
+	node.mu.Lock()
+	defer node.mu.Unlock()
+
+	if node.IsDivided {
+		return
+	}
+
 	node.SE = NewTreeNode(node.Lat1, (node.Lat1+node.Lat2)/2, (node.Lon1+node.Lon2)/2, node.Lon2, node.Capacity)
 	node.SW = NewTreeNode(node.Lat1, (node.Lat1+node.Lat2)/2, node.Lon1, (node.Lon1+node.Lon2)/2, node.Capacity)
 	node.NE = NewTreeNode((node.Lat1+node.Lat2)/2, node.Lat2, (node.Lon1+node.Lon2)/2, node.Lon2, node.Capacity)
 	node.NW = NewTreeNode((node.Lat1+node.Lat2)/2, node.Lat2, node.Lon1, (node.Lon1+node.Lon2)/2, node.Capacity)
 
 	node.IsDivided = true
-	node.mu.Lock()
 	for i, location := range node.Objects {
 		if location == nil {
 			panic("The Node is holding nil location. weird don't you think?. Location index: " + i)
@@ -148,12 +152,8 @@ func (node *TreeNode) divide() {
 			}
 		}
 	}
-	node.mu.Unlock()
 
-	// TODO: I want to set Objects as nil but some test fail, maybe running to fast in a concurrent manner. Fix this so we don't waste memory
-	node.mu.Lock()
 	node.Objects = map[string]*Location{}
-	node.mu.Unlock()
 }
 
 func (*QuadTree) reBalance() {
@@ -173,12 +173,13 @@ func (node *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 
 	}
 
 	if !node.IsDivided {
-
+		node.mu.RLock()
 		for _, location := range node.Objects {
 			if location.Lon() >= lon1 && location.Lon() <= lon2 && location.Lat() >= lat1 && location.Lat() <= lat2 {
 				locations = append(locations, location)
 			}
 		}
+		node.mu.RUnlock()
 
 		return locations
 	}
@@ -206,8 +207,10 @@ func (node *TreeNode) ForceDivide(level int) {
 	if level == 0 {
 		return
 	}
+	if !node.IsDivided {
+		node.divide()
+	}
 
-	node.divide()
 	level--
 
 	node.NE.ForceDivide(level)

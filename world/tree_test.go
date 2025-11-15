@@ -1,8 +1,9 @@
 package world
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTree(t *testing.T) {
@@ -39,6 +40,16 @@ func TestTree(t *testing.T) {
 	})
 	t.Run("Insert", func(t *testing.T) {
 		t.Parallel()
+
+		t.Run("Should return an error if location is nil", func(t *testing.T) {
+			t.Parallel()
+			tree := NewQuadTree(-90, 90, -180, 180)
+
+			err := tree.Insert(nil)
+			if err != TreeErrLocationNil {
+				t.Fatalf("Expected TreeErrLocationNil, got %v", err)
+			}
+		})
 		t.Run("Should insert a location", func(t *testing.T) {
 			t.Parallel()
 			tree := NewQuadTree(-90, 90, -180, 180)

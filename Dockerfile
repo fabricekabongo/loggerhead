@@ -11,7 +11,7 @@
 ARG GO_VERSION=1.25.4-alpine
 FROM --platform=$BUILDPLATFORM golang:${GO_VERSION} AS build
 WORKDIR /src
-RUN apk add build-base=0.5-r3
+RUN apk add --no-cache build-base=0.5-r3
 # Download dependencies as a separate step to take advantage of Docker's caching.
 # Leverage a cache mount to /go/pkg/mod/ to speed up subsequent builds.
 # Leverage bind mounts to go.sum and go.mod to avoid having to copy them into
@@ -49,7 +49,7 @@ FROM alpine:3.22 AS final
 # Install any runtime dependencies that are needed to run your application.
 # Leverage a cache mount to /var/cache/apk/ to speed up subsequent builds.
 RUN --mount=type=cache,target=/var/cache/apk \
-    apk --update add \
+    apk --no-cache  add \
         ca-certificates=20251003-r0 \
         tzdata=2025b-r0 \
         && \

@@ -113,6 +113,12 @@ func validateLatLon(lat float64, lon float64) error {
 	return nil
 }
 
+func (l *Location) SetNode(node *TreeNode) {
+	l.Node.mu.Lock()
+	l.Node = node
+	l.Node.mu.Unlock()
+}
+
 func (l *Location) String() string {
 	return fmt.Sprintf("%s,%s,%f,%f", l.ns, l.id, l.lat, l.lon)
 }

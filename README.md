@@ -1,22 +1,249 @@
 ![Brimston (1)](https://github.com/fabricekabongo/loggerhead/assets/4486484/5d1c7777-ccce-44a5-bc5f-f2e5de23d96f)
-[![DeepSource](https://app.deepsource.com/gh/fabricekabongo/loggerhead.svg/?label=active+issues&show_trend=true&token=y2MpvgmywVPyLIUiutUfCDve)](https://app.deepsource.com/gh/fabricekabongo/loggerhead/)
+[![DeepSource](https://app.deepsource.com/gh/fabricekabongo/loggerhead.svg/?label=active+issues\&show_trend=true\&token=y2MpvgmywVPyLIUiutUfCDve)](https://app.deepsource.com/gh/fabricekabongo/loggerhead/)
 
 # Loggerhead
 
+**Loggerhead is a geospatial in-memory database for fast location lookups and area queries.**
+You send it latitude/longitude points, and it gives you simple ways to:
 
-Loggerhead is a geospatial in-memory database built in Go. It is designed to be fast, efficient and to be used in a distributed environment
-like Kubernetes.
+* Save positions.
+* Read back the latest position of an object.
+* Query all points inside a rectangular area.
+* Delete points.
 
-It uses a gossip-based membership system and performs a best-effort synchronization of the nodes.
+It’s written in Go, optimized for high throughput, and designed to run as a **small cluster** of nodes (e.g. on Kubernetes). Nodes discover each other via a **gossip-based membership system** and keep state **best-effort synchronized** across the cluster.
 
-## Benchmark of the core world engine
+If you’re building anything that keeps track of “things on a map” and needs to read/write them quickly, Loggerhead is meant to be the geospatial engine you don’t have to think about.
 
-I ran the benchmark for 2 seconds, with the engine running on 1,2,4,8,16 and 32 cores. 
-I will display here only performance on 1,2, and 4 cores. 
-This tests the core engine of the database, it doesn't test the connection as this add more variable based on the environment.
-Expect slight decrease in performance when using with real network.
+---
 
-### Engine running on 1 Core
+## Why Loggerhead?
+
+**Straightforward mental model**
+
+* Store points as `(namespace, id, lat, lon)`.
+* Query by **ID** (`GET`) or by **area** (`POLY`).
+* Use a simple text protocol over TCP (`SAVE`, `GET`, `DELETE`, `POLY`).
+
+**Fast in-memory engine**
+
+* Geospatial data is kept in memory and indexed with a **quadtree**.
+* Benchmarks (on an AMD EPYC 7763) show:
+
+  * ~20–25M `GetLocation` lookups per second.
+  * ~500k `Save` operations per second.
+  * City-scale radius queries in ~200 µs, dropping under 50 µs on 4 cores.
+  * Continent-scale radius queries in ~10–15 ms on 4 cores.
+
+**Cluster-aware**
+
+* Nodes use **gossip** to discover each other and share state.
+* Best-effort synchronization between nodes.
+* Works nicely with DNS-based discovery in Kubernetes.
+
+**Operational hooks**
+
+* **Prometheus metrics** exposed over HTTP.
+* Basic **admin interface** to visualize cluster state.
+
+Loggerhead is intentionally focused: a fast, in-memory geospatial store with a small surface area. You can pair it with your existing databases and services without changing your whole stack.
+
+---
+
+## Quick Start
+
+### Build
+
+Loggerhead requires **Go 1.22.1** and **GCC** to build.
+
+```bash
+CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o loggerhead
+```
+
+### Run a node
+
+```bash
+./loggerhead --cluster-dns=loggerhead.default.svc.cluster.local
+```
+
+Sample output:
+
+```text
+2024/06/10 01:44:07 Please set the following environment variables:
+2024/06/10 01:44:07 CLUSTER_DNS
+2024/06/10 01:44:07 Reverting to flags...
+2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  [::1]:20001
+2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=[::1]:42194
+2024/06/10 01:44:07 Sharing local state to a new node
+...
+===========================================================
+Starting the Database Server
+Cluster DNS:  loggerhead.default.svc.cluster.local
+Use the following ports for the following services:
+Writing location update: 19999
+Reading location update: 19998
+Admin UI (/) & Metrics(/metrics): 20000
+Clustering: 20001
+===========================================================
+```
+
+### Save and read your first point
+
+Open a terminal:
+
+```bash
+telnet localhost 19999
+```
+
+Save a point:
+
+```text
+SAVE mynamespace myid 12.560000 13.560000
+>> 1.0,saved
+```
+
+Read it back:
+
+```bash
+telnet localhost 19998
+```
+
+```text
+GET mynamespace myid
+>> 1.0,mynamespace,myid,12.560000,13.560000
+```
+
+Query everything in an area (POLY):
+
+```text
+POLY mynamespace 10.560000 10.560000 15.560000 15.560000
+>> 1.0,mynamespace,myid,12.560000,13.560000
+>> 1.0,mynamespace,myid2,12.560000,11.560000
+>> 1.0,mynamespace,myid3,14.560000,13.560000
+>> 1.0,done
+```
+
+> Note: the `1.0` prefix is the **protocol version**, so clients can detect changes in the future.
+
+---
+
+## Ports & Architecture
+
+A running Loggerhead node exposes several ports:
+
+* **19998** – Read queries (`GET`, `POLY`).
+* **19999** – Write queries (`SAVE`, `DELETE`).
+* **20000** – HTTP admin interface & `/metrics` endpoint (Prometheus).
+* **20001** – Gossip port for cluster communication.
+
+You typically run **multiple nodes**, point them at the same `CLUSTER_DNS`, and let Loggerhead handle discovery and membership via gossip.
+
+---
+
+## Configuration
+
+You can configure Loggerhead using **environment variables** or **command-line flags**.
+
+Currently supported:
+
+* **`CLUSTER_DNS`**
+  DNS name used to discover other nodes.
+  Loggerhead looks up this DNS record and uses the IPs as peers.
+
+  This is particularly convenient in Kubernetes; you can provide the service DNS (for example `loggerhead.default.svc.cluster.local`), and nodes will discover each other. When you scale up, new nodes automatically join the cluster.
+
+* **`MAX_CONNECTIONS`**
+  Maximum number of connections allowed per port (separately for READ and WRITE).
+  Too few connections can create congestion per CPU core; too many can push CPU to 100% and slow everything down. Loggerhead is usually called by backend services, so you rarely need to expose huge numbers of connections.
+  If you need many connections, you may also have to adjust `ulimit` on Linux.
+
+* **`SEED_NODES`** *(coming soon)*
+  Planned: a list of seed nodes to bootstrap the cluster.
+
+---
+
+## Query Language
+
+Loggerhead speaks a very small text protocol over TCP. Each message starts with a version prefix (`1.0` currently).
+
+### Reading (port 19998)
+
+#### GET
+
+Get the last known position for a given `(namespace, id)`:
+
+```text
+telnet localhost 19998
+GET mynamespace myid
+
+>> 1.0,mynamespace,myid,12.560000,13.560000
+```
+
+#### POLY
+
+Get all points in a rectangular area (min lat/lon, max lat/lon):
+
+```text
+telnet localhost 19998
+POLY mynamespace 10.560000 10.560000 15.560000 15.560000
+>> 1.0,mynamespace,myid,12.560000,13.560000
+>> 1.0,mynamespace,myid2,12.560000,11.560000
+>> 1.0,mynamespace,myid3,14.560000,13.560000
+>> 1.0,done
+```
+
+### Writing (port 19999)
+
+> Tip: use short names for `namespace` and `id` when possible. Loggerhead uses Go maps internally, and shorter string keys can be slightly faster.
+
+#### SAVE
+
+Insert or update a point:
+
+```text
+telnet localhost 19999
+SAVE mynamespace myid 12.560000 13.560000
+>> 1.0,saved
+```
+
+#### DELETE
+
+Remove a point:
+
+```text
+telnet localhost 19999
+DELETE mynamespace myid
+>> 1.0,deleted
+```
+
+---
+
+## Performance
+
+The in-memory engine has been benchmarked on an **AMD EPYC 7763 64-core processor** using Go 1.22.1.
+
+Headline numbers (for 1–4 cores):
+
+* ~20–25M `GetLocation` lookups per second.
+* ~500k `Save` operations per second.
+* City-scale radius queries in ~200 µs, dropping under 50 µs on 4 cores.
+* Continent-scale radius queries in ~10–15 ms on 4 cores.
+
+**Delete performance note**
+
+Deletes are currently protected by a **global/index-level lock**. Under synthetic benchmarks that hammer deletes on 4 cores, this shows up as contention and increased latency. In most real workloads, deletes are rare compared to reads and writes, but this is a known area to optimize.
+
+---
+
+## Benchmark of the Core World Engine
+
+These benchmarks test the **core in-memory engine** only. They do **not** include network or protocol overhead, to keep the numbers comparable across environments.
+
+* Benchmark duration: **2 seconds** per run.
+* Cores tested: **1, 2, 4, 8, 16, 32** (only 1 / 2 / 4 shown here).
+* Expect a slight decrease in end-to-end performance when using a real network.
+
+### Engine running on 1 core
 
 | Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
 | -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
@@ -38,7 +265,6 @@ Expect slight decrease in performance when using with real network.
 | GetLocationsInRadius | Locations in all of Africa (~30M km²) | 100            | 30,380,619     | 21,837,460   | 12,006      |
 | Delete               | Delete a location                     | 48,852,799     | 50.14          | 7            | 0           |
 
-
 ### Engine running on 4 cores
 
 | Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
@@ -50,141 +276,35 @@ Expect slight decrease in performance when using with real network.
 | GetLocationsInRadius | Locations in all of Africa (~30M km²) | 171            | 14,131,393     | 15,556,630   | 10,700      |
 | Delete               | Delete a location                     | 6,145,867      | 328.1          | 7            | 0           |
 
+---
 
+## Roadmap to 0.1.0
 
+Loggerhead is still early, but there’s a clear path for where it’s going.
 
-## Usage
+### Planned
 
-The database exposes multiple ports for different purposes:
+* [ ] **Polygon subscriptions** – subscribe to updates for a polygon and receive changes. Planned for `0.0.4`.
+* [ ] **Realistic benchmarks with ADS-B traffic** – use about a week of global ADS-B data for stress-testing. Planned for `0.0.5`.
+* [ ] **Optional RAFT-based consistency** – enable a RAFT mode for stronger consistency within a cluster (trading some performance for guarantees). Planned for `0.1.0`.
+* [ ] **Sharding by namespace** – shard namespaces across TreeNodes with primary + replication (multiple RAFT groups in parallel). Planned for `0.2.0`.
+* [ ] **Durability** – store and recover state from disk. Planned for `0.3.0`.
 
-- 19998: for Reads queries.
-- 19999: for Writes queries.
-- 20000: for HTTP to consume metrics(Prometheus) and the admin interface where you can visualize the state of the cluster
-- 20001: for the gossip protocol to communicate with other nodes
+### Already done
 
-## Configuration
+* [x] Improve Prometheus metrics (`0.0.3`).
+* [x] Reduce clustering chatter to avoid saturating the network (`0.0.2`).
+* [x] Connect query language to the database.
+* [x] Wire network interface to the query processor.
+* [x] Implement in-memory storage using a **quadtree**.
+* [x] Implement storage benchmarks.
+* [x] Implement network interface.
+* [x] Implement query language.
+* [x] Implement clustering.
+* [x] Implement Prometheus metrics.
+* [x] Implement admin interface.
+* [x] Implement gossip protocol.
 
-The database can be configured using environment variables or command line arguments.
-So far, only two configurations are supported:
+---
 
-- `CLUSTER_DNS`: the DNS name of the cluster; this is used to discover other nodes in the cluster by extracting the
-  IP addresses from the DNS record. This is very convenient for Kubernetes; you provide the service DNS, e.g., loggerhead.default.svc.cluster.local, and the database will find the other nodes quickly. If you scale up, the new nodes will join the cluster automatically).
-- `MAX_CONNECTIONS`: This is the number of connections you want to allow per port (each for READ and PORT). You need to find the right balance between too few, which creates congestion on the operations per CPU Core (although it can handle quite a lot), and too many, which risks making the CPU go to 100% and slow the system. The idea here is that the database will be called by your backend services, so there is no need to allow too many connections. If you plan to open many connections, you must modify ulimit in Linux.
-- `SEED_NODES`: (coming soon): a list of seed nodes to bootstrap the cluster.
-
-## Building
-
-The database requires 1.22.1 and GCC to build.
-
-```shell
-CGO_ENABLED=1 GOARCH=$TARGETARCH go build -o loggerhead
-```
-
-## Running
-
-```shell
-
-./loggerhead --cluster-dns=loggerhead.default.svc.cluster.local
-
-```
-
-The output will look like this:
-
-```
-2024/06/10 01:44:07 Please set the following environment variables:
-2024/06/10 01:44:07 CLUSTER_DNS
-2024/06/10 01:44:07 Reverting to flags...
-2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  [::1]:20001
-2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=[::1]:42194
-2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  172.45.0.2:20001
-2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=172.45.0.2:48278
-2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Initiating push/pull sync with:  172.45.0.2:20001
-2024/06/10 01:44:07 Sharing local state to a new node
-2024/06/10 01:44:07 [DEBUG] memberlist: Stream connection from=172.45.0.2:48282
-2024/06/10 01:44:07 Sharing local state to a new node
-===========================================================
-Starting the Database Server
-Cluster DNS:  loggerhead.default.svc.cluster.local
-Use the following ports for the following services:
-Writing location update: 19999
-Reading location update: 19998
-Admin UI (/) & Metrics(/metrics): 20000
-Clustering: 20001
-===========================================================
-
-```
-
-# Querying
-
-The database supports the following queries: GET, SAVE, DELETE, and POLY (for polygon).
-
-## READ
-You must connect to port 19998 to read data from the database.
-
-*Note that the "1.0" at the beginning of each message is the version of the format, should the format change in the future, I want the client to be able to identify that immediately.*
-
-### GET
-```shell
-telnet localhost 19998
-GET mynamespace myid
-
->> 1.0,mynamespace,myid,12.560000,13.560000
-```
-
-## POLY
-```shell
-telnet localhost 19998
-POLY mynamespace 10.560000 10.560000 15.560000 15.560000
->> 1.0,mynamespace,myid,12.560000,13.560000
->> 1.0,mynamespace,myid2,12.560000,11.560000
->> 1.0,mynamespace,myid3,14.560000,13.560000
->> 1.0,done
-```
-
-## Writing
-You will need to connect to port 19999 to write data to the database.
-
-*try using short names for the namespace and id, as I use golang maps to store the data* and the maps are faster with short strings as keys.
-
-## SAVE
-```shell
-telnet localhost 19999
-SAVE mynamespace myid 12.560000 13.560000
->> 1.0,saved
-```
-
-## DELETE
-```shell
-telnet localhost 19999
-DELETE mynamespace myid
->> 1.0,deleted
-```
-## Path to 0.1.0
-
-### TODO
-
-- [ ] Implement subscription to Polygon's updates. Planned for `0.0.4`
-- [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.5`
-- [ ] Offer the ability to enable RAFT for a cluster instead of just Gossip for consistency between nodes (slower). Planned for `0.1.0`
-- [ ] Offer the ability to shard namespaces by TreeNodes with primary and replication across nodes (basically multiple RAFT running in parallel) `0.2.0`
-- [ ] Implement storing and recovering state from disk. Planned for `0.3.0`
-
-### Done
-
-- [X] Improve the usage of Prometheus. Planned for `0.0.3`
-- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
-- [X] Connect the query language to the database
-- [X] Connect the network interface to the database through the query processor
-- [X] Implement the memory storage using a quadtree
-- [X] Implement Benchmark for the storage
-- [X] Implement the network interface
-- [X] Implement the query language
-- [X] Implement the clustering
-- [X] Implement the Prometheus metrics
-- [X] Implement the admin interface
-- [X] Implement the gossip protocol
-
+If you have ideas, issues, or a workload you’d like to try on Loggerhead, opening an issue or sharing your use case will directly shape where this engine goes next.

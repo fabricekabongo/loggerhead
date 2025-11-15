@@ -134,6 +134,7 @@ func (*OpsServer) AdminUI() http.Handler {
 		err := TMPL.Execute(w, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	})
 }

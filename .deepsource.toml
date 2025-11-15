@@ -2,6 +2,8 @@ version = 1
 
 [[analyzers]]
 name = "go"
+name = "test-coverage"
+enabled = true
 
   [analyzers.meta]
   import_root = "github.com/fabricekabongo/loggerhead"

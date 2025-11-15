@@ -3,35 +3,45 @@
 
 # Loggerhead
 
-## Path to 0.1.0
-
-### TODO
-
-- [ ] Implement subscription to Polygon's updates. Planned for `0.0.4`
-- [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.5`
-- [ ] Offer the ability to enable RAFT for a cluster instead of just Gossip for consistency between nodes (slower). Planned for `0.1.0`
-- [ ] Offer the ability to shard namespaces by TreeNodes with primary and replication across nodes (basically multiple RAFT running in parallel) `0.2.0`
-- [ ] Implement storing and recovering state from disk. Planned for `0.3.0`
-
-### Done
-
-- [X] Improve the usage of Prometheus. Planned for `0.0.3`
-- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
-- [X] Connect the query language to the database
-- [X] Connect the network interface to the database through the query processor
-- [X] Implement the memory storage using a quadtree
-- [X] Implement Benchmark for the storage
-- [X] Implement the network interface
-- [X] Implement the query language
-- [X] Implement the clustering
-- [X] Implement the Prometheus metrics
-- [X] Implement the admin interface
-- [X] Implement the gossip protocol
 
 Loggerhead is a geospatial in-memory database built in Go. It is designed to be fast, efficient and to be used in a distributed environment
 like Kubernetes.
 
 It uses a gossip-based membership system and performs a best-effort synchronization of the nodes.
+
+## Benchmark of the core world engine
+
+I ran the benchmark for 2 seconds, with the engine running on 1,2,4,8,16 and 32 cores. 
+I will display here only performance on 1,2, and 4 cores. 
+I also run the test single threaded (1 request at a time, more wait) and multithreaded (as many request as the core can handle sending, more chance of read/write locks).
+This tests the core engine of the database, it doesn't test the connection as this add more variable based on the environment.
+
+Expect slight decrease in performance when using with real network.
+
+### Engine running on 1 Core
+
+#### Single Threaded Test
+
+| Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
+| -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
+| Save                 | Save a new location                   | 2,674,922      | 1,931          | 214          | 1           |
+| GetLocation          | Return a single location              | 11,557,712     | 214.6          | 7            | 0           |
+| GetLocationsInRadius | Locations in Singapore (~734.3 km²)   | 3,264,337      | 748.2          | 44           | 1           |
+| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 586,419        | 28,216         | 8,198        | 8           |
+| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 1,310          | 8,521,009      | 2,612,440    | 1,154       |
+| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 1,027          | 9,785,152      | 3,176,647    | 1,331       |
+| Delete               | Delete a location                     | 50,617,816     | 49.44          | 7            | 0           |
+
+#### MultiThreaded Test
+
+| Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
+| -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
+| Save                 | Save a new location                   | 2,691,468      | 1,982          | 216          | 1           |
+| GetLocation          | Return a single location              | 54,935,690     | 41.60          | 0            | 0           |
+| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 10,000         | 212,897        | 85,952       | 83          |
+| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 100            | 82,167,521     | 26,660,673   | 11,594      |
+| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 100            | 99,728,196     | 32,027,345   | 13,281      |
+| Delete               | Delete a location                     | 54,722,920     | 46.31          | 7            | 0           | 
 
 ## Usage
 
@@ -143,5 +153,28 @@ telnet localhost 19999
 DELETE mynamespace myid
 >> 1.0,deleted
 ```
+## Path to 0.1.0
 
+### TODO
+
+- [ ] Implement subscription to Polygon's updates. Planned for `0.0.4`
+- [ ] Use real ADSB traffic (I'm thinking a week's worth of global traffic) as data to run realistic benchmark `0.0.5`
+- [ ] Offer the ability to enable RAFT for a cluster instead of just Gossip for consistency between nodes (slower). Planned for `0.1.0`
+- [ ] Offer the ability to shard namespaces by TreeNodes with primary and replication across nodes (basically multiple RAFT running in parallel) `0.2.0`
+- [ ] Implement storing and recovering state from disk. Planned for `0.3.0`
+
+### Done
+
+- [X] Improve the usage of Prometheus. Planned for `0.0.3`
+- [X] Reduce chatter in the clustering protocol and prevent the DB from saturating the network with messages. Planned for `0.0.2`
+- [X] Connect the query language to the database
+- [X] Connect the network interface to the database through the query processor
+- [X] Implement the memory storage using a quadtree
+- [X] Implement Benchmark for the storage
+- [X] Implement the network interface
+- [X] Implement the query language
+- [X] Implement the clustering
+- [X] Implement the Prometheus metrics
+- [X] Implement the admin interface
+- [X] Implement the gossip protocol
 

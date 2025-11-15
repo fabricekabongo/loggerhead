@@ -22,22 +22,4 @@ jobs:
         go-version: '1.25.4'
 
     - name: Perform the benchmark with 1 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=1
-
-    - name: Perform the benchmark with 2 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=2
-
-    - name: Perform the benchmark with 4 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=4
-    
-    - name: Perform the benchmark with 8 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=8
-    
-    - name: Perform the benchmark with 16 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=16
-
-    - name: Perform the benchmark with 32 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=32
-    
-    - name: Perform the benchmark with 64 CPU
-      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=64
+      run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=1,2,4

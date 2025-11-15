@@ -121,9 +121,6 @@ func (node *TreeNode) Delete(id string) {
 
 func (node *TreeNode) divide() {
 	defer treeDivision.Inc()
-	node.mu.Lock()
-	defer node.mu.Unlock()
-
 	if node.IsDivided {
 		return
 	}
@@ -207,9 +204,12 @@ func (node *TreeNode) ForceDivide(level int) {
 	if level == 0 {
 		return
 	}
+	node.mu.Lock()
+
 	if !node.IsDivided {
 		node.divide()
 	}
+	node.mu.Unlock()
 
 	level--
 

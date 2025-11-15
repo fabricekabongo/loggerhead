@@ -21,5 +21,5 @@ jobs:
       with:
         go-version: '1.25.4'
 
-    - name: Perform the benchmark with 1 CPU
+    - name: Perform the benchmark with 1,2,4 CPUs
       run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=1,2,4

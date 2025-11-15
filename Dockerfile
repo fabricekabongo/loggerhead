@@ -50,8 +50,8 @@ FROM alpine:3.22 AS final
 # Leverage a cache mount to /var/cache/apk/ to speed up subsequent builds.
 RUN --mount=type=cache,target=/var/cache/apk \
     apk --update add \
-        ca-certificates \
-        tzdata \
+        ca-certificates=20251003-r0 \
+        tzdata=2025b-r0 \
         && \
         update-ca-certificates
 

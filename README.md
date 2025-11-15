@@ -1,5 +1,7 @@
 ![Brimston (1)](https://github.com/fabricekabongo/loggerhead/assets/4486484/5d1c7777-ccce-44a5-bc5f-f2e5de23d96f)
+[![DeepSource](https://app.deepsource.com/gh/fabricekabongo/loggerhead.svg/?label=code+coverage&show_trend=true&token=y2MpvgmywVPyLIUiutUfCDve)](https://app.deepsource.com/gh/fabricekabongo/loggerhead/)
 [![DeepSource](https://app.deepsource.com/gh/fabricekabongo/loggerhead.svg/?label=active+issues\&show_trend=true\&token=y2MpvgmywVPyLIUiutUfCDve)](https://app.deepsource.com/gh/fabricekabongo/loggerhead/)
+[![DeepSource](https://app.deepsource.com/gh/fabricekabongo/loggerhead.svg/?label=resolved+issues&show_trend=true&token=y2MpvgmywVPyLIUiutUfCDve)](https://app.deepsource.com/gh/fabricekabongo/loggerhead/)
 
 # Loggerhead
 

@@ -29,6 +29,6 @@ jobs:
     - name: Report test coverage to DeepSource
       uses: deepsourcelabs/test-coverage-action@master
       with:
-        key: golang
+        key: go
         coverage-file: coverage.out
         dsn: ${{ secrets.DEEPSOURCE_DSN }}

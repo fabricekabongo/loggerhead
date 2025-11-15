@@ -49,7 +49,7 @@ jobs:
           go-version: '1.22.4'
 
       - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=4
+        run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=4
 
 
   benchmark-8-cpu:
@@ -63,7 +63,7 @@ jobs:
           go-version: '1.22.4'
 
       - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=8
+        run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=8
 
 
 
@@ -78,7 +78,7 @@ jobs:
           go-version: '1.22.4'
 
       - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=16
+        run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=16
 
 
   benchmark-32-cpu:
@@ -92,7 +92,7 @@ jobs:
           go-version: '1.22.4'
 
       - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=32
+        run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=32
 
   benchmark-64-cpu:
     runs-on: ubuntu-latest
@@ -105,4 +105,4 @@ jobs:
           go-version: '1.22.4'
 
       - name: Perform the benchmark
-        run: cd world && go test -bench=. -benchmem -benchtime=1s -cpu=64
+        run: cd world && go test -bench=. -benchmem -benchtime=2s -cpu=64

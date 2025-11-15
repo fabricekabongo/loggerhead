@@ -5,3 +5,4 @@ name = "go"
 
   [analyzers.meta]
   import_root = "github.com/fabricekabongo/loggerhead"
+  dependencies_vendored = true

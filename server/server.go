@@ -62,7 +62,7 @@ func (s *Server) startListener(listener *Listener) {
 	listener.Handler.listen(netListener)
 }
 
-func (s *Server) createListener(listener *Listener) net.Listener {
+func (_ *Server) createListener(listener *Listener) net.Listener {
 	netListener, err := net.Listen(string(listener.Type), ":"+strconv.Itoa(listener.Port))
 	if err != nil {
 		panic("Error creating listener: " + err.Error())

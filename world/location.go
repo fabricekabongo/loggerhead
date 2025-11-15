@@ -4,9 +4,10 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"time"
 )
 
 var (
@@ -58,7 +59,7 @@ func NewLocation(ns string, id string, lat float64, lon float64) (*Location, err
 	return loc, nil
 }
 
-func (l *Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
+func (*Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
 	if len(id) == 0 {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredId

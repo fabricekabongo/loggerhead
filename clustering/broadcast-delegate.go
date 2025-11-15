@@ -1,13 +1,14 @@
 package clustering
 
 import (
+	"log"
+	"os"
+
 	"github.com/fabricekabongo/loggerhead/query"
 	"github.com/fabricekabongo/loggerhead/world"
 	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
-	"log"
-	"os"
 )
 
 var (
@@ -52,7 +53,7 @@ func newBroadcastDelegate(engine *query.Engine, broadcasts *memberlist.TransmitL
 	}
 }
 
-func (d *BroadcastDelegate) NodeMeta(limit int) []byte {
+func (*BroadcastDelegate) NodeMeta(limit int) []byte {
 	return []byte{}
 }
 

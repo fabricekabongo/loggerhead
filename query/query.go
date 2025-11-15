@@ -206,7 +206,7 @@ func (p *GetQueryProcessor) Execute(query string) string {
 	return stringBuilder.String()
 }
 
-func (p *GetQueryProcessor) CanProcess(query string) bool {
+func (*GetQueryProcessor) CanProcess(query string) bool {
 	chunks := strings.Split(query, " ")
 	if len(chunks) != 3 {
 		return false
@@ -249,7 +249,7 @@ func (p *DeleteQueryProcessor) Execute(query string) string {
 	return version + ",deleted\n"
 }
 
-func (p *DeleteQueryProcessor) CanProcess(query string) bool {
+func (*DeleteQueryProcessor) CanProcess(query string) bool {
 	chunks := strings.Split(query, " ")
 	if len(chunks) != 3 {
 		return false
@@ -306,7 +306,7 @@ func (p *SaveQueryProcessor) Execute(query string) string {
 	return version + ",saved\n"
 }
 
-func (p *SaveQueryProcessor) CanProcess(query string) bool {
+func (*SaveQueryProcessor) CanProcess(query string) bool {
 	chunks := strings.Split(query, " ")
 	if len(chunks) != 5 {
 		return false
@@ -371,7 +371,7 @@ func (p *PolyQueryProcessor) Execute(query string) string {
 	return result.String()
 }
 
-func (p *PolyQueryProcessor) CanProcess(query string) bool {
+func (*PolyQueryProcessor) CanProcess(query string) bool {
 	chunks := strings.Split(query, " ")
 	if len(chunks) != 6 {
 		return false

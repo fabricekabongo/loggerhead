@@ -3,13 +3,14 @@ package admin
 import (
 	"embed"
 	"encoding/json"
-	"github.com/fabricekabongo/loggerhead/clustering"
-	"github.com/fabricekabongo/loggerhead/config"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"html/template"
 	"log"
 	"net/http"
 	"runtime"
+
+	"github.com/fabricekabongo/loggerhead/clustering"
+	"github.com/fabricekabongo/loggerhead/config"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 var (
@@ -128,8 +129,8 @@ func (o *OpsServer) AdminData() http.Handler {
 	})
 }
 
-func (o *OpsServer) AdminUI() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func (*OpsServer) AdminUI() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		err := TMPL.Execute(w, nil)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)

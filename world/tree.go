@@ -2,10 +2,11 @@ package world
 
 import (
 	"errors"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"math"
 	"sync"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -155,7 +156,7 @@ func (node *TreeNode) divide() {
 	node.mu.Unlock()
 }
 
-func (q *QuadTree) reBalance() {
+func (*QuadTree) reBalance() {
 	// TODO: Implement rebalancing
 }
 

@@ -35,11 +35,11 @@ type Location struct {
 }
 
 func NewLocation(ns string, id string, lat float64, lon float64) (*Location, error) {
-	if len(id) == 0 {
+	if id == "" {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredId
 	}
-	if len(ns) == 0 {
+	if ns == "" {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredNamespace
 	}
@@ -60,11 +60,11 @@ func NewLocation(ns string, id string, lat float64, lon float64) (*Location, err
 }
 
 func (*Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
-	if len(id) == 0 {
+	if id == "" {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredId
 	}
-	if len(ns) == 0 {
+	if ns == "" {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredNamespace
 	}

@@ -13,26 +13,10 @@ It uses a gossip-based membership system and performs a best-effort synchronizat
 
 I ran the benchmark for 2 seconds, with the engine running on 1,2,4,8,16 and 32 cores. 
 I will display here only performance on 1,2, and 4 cores. 
-I also run the test single threaded (1 request at a time, more wait) and multithreaded (as many request as the core can handle sending, more chance of read/write locks).
 This tests the core engine of the database, it doesn't test the connection as this add more variable based on the environment.
-
 Expect slight decrease in performance when using with real network.
 
 ### Engine running on 1 Core
-
-#### Single Threaded Test
-
-| Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
-| -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
-| Save                 | Save a new location                   | 2,674,922      | 1,931          | 214          | 1           |
-| GetLocation          | Return a single location              | 11,557,712     | 214.6          | 7            | 0           |
-| GetLocationsInRadius | Locations in Singapore (~734.3 km²)   | 3,264,337      | 748.2          | 44           | 1           |
-| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 586,419        | 28,216         | 8,198        | 8           |
-| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 1,310          | 8,521,009      | 2,612,440    | 1,154       |
-| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 1,027          | 9,785,152      | 3,176,647    | 1,331       |
-| Delete               | Delete a location                     | 50,617,816     | 49.44          | 7            | 0           |
-
-#### MultiThreaded Test
 
 | Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
 | -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
@@ -44,20 +28,6 @@ Expect slight decrease in performance when using with real network.
 | Delete               | Delete a location                     | 54,722,920     | 46.31          | 7            | 0           |
 
 ### Engine running on 2 cores
-
-#### Single Threaded Test
-
-| Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
-| -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
-| Save                 | Save a new location                   | 2,579,481      | 1,581          | 191          | 1           |
-| GetLocation          | Return a single location              | 11,384,558     | 201.7          | 7            | 0           |
-| GetLocationsInRadius | Locations in Singapore (~734.3 km²)   | 3,149,793      | 769.3          | 28           | 1           |
-| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 467,748        | 12,260         | 8,080        | 8           |
-| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 1,318          | 4,504,925      | 2,515,047    | 1,146       |
-| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 1,148          | 5,181,418      | 2,998,856    | 1,313       |
-| Delete               | Delete a location                     | 50,270,070     | 48.34          | 7            | 0           |
-
-#### Multi Threaded Test
 
 | Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
 | -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
@@ -71,28 +41,15 @@ Expect slight decrease in performance when using with real network.
 
 ### Engine running on 4 cores
 
-#### Single Threaded Test
-
 | Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
 | -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
-| Save                 | Save a new location                   | 1,000,000      | 1,377          | 358          | 2           |
-| GetLocation          | Return a single location              | 7,754,721      | 154.1          | 7            | 0           |
-| GetLocationsInRadius | Locations in Singapore (~734.3 km²)   | 1,863,948      | 644.2          | 5            | 0           |
-| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 560,006        | 3,492          | 2,668        | 3           |
-| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 2,576          | 855,589        | 718,302      | 317         |
-| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 1,528          | 1,295,831      | 940,770      | 359         |
-| Delete               | Delete a location                     | 25,431,978     | 48.35          | 7            | 0           |
+| Save                 | Save a new location                   | 5,615,270      | 671.8          | 62           | 1           |
+| GetLocation          | Return a single location              | 48,844,772     | 49.58          | 0            | 0           |
+| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 69,660         | 43,884         | 40,288       | 44          |
+| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 184            | 11,285,953     | 12,295,469   | 9,142       |
+| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 171            | 14,131,393     | 15,556,630   | 10,700      |
+| Delete               | Delete a location                     | 6,145,867      | 328.1          | 7            | 0           |
 
-#### Multi Threaded Test
-
-| Operation            | Scenario / Description                | Iterations (N) | Time / op (ns) | Mem / op (B) | Allocs / op |
-| -------------------- | ------------------------------------- | -------------- | -------------- | ------------ | ----------- |
-| Save                 | Save a new location                   | 3,282,406      | 803.2          | 53           | 1           |
-| GetLocation          | Return a single location              | 18,874,444     | 63.33          | 0            | 0           |
-| GetLocationsInRadius | Locations in the UAE (~83.6k km²)     | 50,386         | 23,041         | 24,008       | 33          |
-| GetLocationsInRadius | Locations in the USA (~9.8M km²)      | 208            | 6,089,438      | 6,361,179    | 3,143       |
-| GetLocationsInRadius | Locations in all of Africa (~30M km²) | 174            | 6,960,838      | 7,979,068    | 3,525       |
-| Delete               | Delete a location                     | 23,993,090     | 49.35          | 7            | 0           |
 
 
 

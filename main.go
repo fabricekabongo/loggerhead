@@ -3,17 +3,18 @@ package main
 import (
 	"errors"
 	"fmt"
+	"log"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
 	"github.com/fabricekabongo/loggerhead/admin"
 	"github.com/fabricekabongo/loggerhead/clustering"
 	"github.com/fabricekabongo/loggerhead/config"
 	"github.com/fabricekabongo/loggerhead/query"
 	"github.com/fabricekabongo/loggerhead/server"
 	"github.com/fabricekabongo/loggerhead/world"
-	"log"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 )
 
 func main() {
@@ -77,8 +78,6 @@ func main() {
 	end := time.Now()
 	fmt.Println("Startup time: ", end.Sub(start))
 	svr.Start()
-
-	return
 }
 
 func printWelcomeMessage(cfg config.Config, cluster *clustering.Cluster) {

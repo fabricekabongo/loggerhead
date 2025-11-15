@@ -4,3 +4,5 @@ loggerhead
 *.pprof
 *.prof
 *.test
+coverage.out
+coverage.txt

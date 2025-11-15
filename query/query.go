@@ -2,14 +2,15 @@ package query
 
 import (
 	"errors"
-	w "github.com/fabricekabongo/loggerhead/world"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	w "github.com/fabricekabongo/loggerhead/world"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
 var (
@@ -183,7 +184,7 @@ func (p *GetQueryProcessor) Execute(query string) string {
 	chunks := strings.Split(query, " ")
 
 	if chunks[0] != "GET" { //No trust
-		panic("Invalid DELETE query")
+		panic("Invalid GET query")
 	}
 
 	namespaceID := chunks[1]

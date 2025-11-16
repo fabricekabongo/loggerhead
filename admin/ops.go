@@ -132,6 +132,7 @@ func (o *OpsServer) AdminData() http.Handler {
 		err := json.NewEncoder(w).Encode(data)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
 		}
 	})
 }

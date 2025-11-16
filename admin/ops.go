@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"runtime"
+	"time"
 
 	"github.com/fabricekabongo/loggerhead/clustering"
 	"github.com/fabricekabongo/loggerhead/config"
@@ -47,7 +48,13 @@ func (o *OpsServer) Start() {
 	http.Handle("/metrics", promhttp.Handler())
 	http.Handle("/admin-data", o.AdminData())
 	http.Handle("/", o.AdminUI())
-	err := http.ListenAndServe(":20000", nil)
+
+	server := &http.Server{
+		Addr:              ":20000",
+		ReadHeaderTimeout: 3 * time.Second,
+	}
+
+	err := server.ListenAndServe()
 	if err != nil {
 		log.Println("Failed to start the admin server: ", err)
 		return

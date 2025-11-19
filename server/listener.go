@@ -96,7 +96,7 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 
 	scanner := bufio.NewScanner(conn)
 
-	var startOfEOF time.Time
+	var startOfEOF time.Time = time.Time{} // start the counter when the connection is opened so that we can track EOF wait time correctly
 
 	for {
 		if !scanner.Scan() {
@@ -107,15 +107,13 @@ func (h *Handler) handleConnection(conn net.Conn) error {
 
 			if startOfEOF.IsZero() {
 				startOfEOF = time.Now()
-			} else {
-				if time.Since(startOfEOF) > h.maxEOFWait {
-					log.Println("Connection timed out. Closing connection")
-					return nil
-				}
+			} else if time.Since(startOfEOF) > h.maxEOFWait {
+				log.Println("Connection timed out. Closing connection")
+				return nil
 			}
-
 			continue
 		}
+
 		startOfEOF = time.Time{}
 		line := scanner.Text()
 		if line == "" {

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/gob"
 	"errors"
-	"log"
 	"sync"
 )
 
@@ -97,7 +96,7 @@ func NewWorldFromBytes(buf []byte) *World {
 	err := dec.Decode(&w)
 
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
 
 	return &w
@@ -111,7 +110,7 @@ func (m *World) Merge(w *World) {
 		for locId, loc := range n.locations {
 			err := m.Save(ns, locId, loc.Lat(), loc.Lon())
 			if err != nil {
-				log.Fatal("Error merging world: ", err)
+				panic(err)
 			}
 		}
 	}

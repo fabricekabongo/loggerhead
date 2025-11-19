@@ -2,13 +2,14 @@ package clustering
 
 import (
 	"errors"
-	"github.com/fabricekabongo/loggerhead/config"
-	"github.com/fabricekabongo/loggerhead/query"
-	"github.com/hashicorp/memberlist"
 	"log"
 	"net"
 	"os"
 	"time"
+
+	"github.com/fabricekabongo/loggerhead/config"
+	"github.com/fabricekabongo/loggerhead/query"
+	"github.com/hashicorp/memberlist"
 )
 
 var (
@@ -65,7 +66,7 @@ func NewCluster(engine *query.Engine, config config.Config) (*Cluster, error) {
 
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Fatal("Failed to get hostname: ", err)
+		panic(err)
 	}
 
 	cfg := memberlist.DefaultLocalConfig()

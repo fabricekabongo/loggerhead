@@ -153,10 +153,6 @@ func (node *TreeNode) divide() {
 	node.Objects = map[string]*Location{}
 }
 
-func (*QuadTree) reBalance() {
-	// TODO: Implement rebalancing
-}
-
 func rectangleOverlap(lat1, lat2, lon1, lon2, lat3, lat4, lon3, lon4 float64) bool {
 	return math.Max(lat1, lat3) < math.Min(lat2, lat4) && math.Max(lon1, lon3) < math.Min(lon2, lon4)
 }

@@ -18,8 +18,11 @@ var (
 	//go:embed template
 	TemplateFS embed.FS
 	//go:embed static
-	StaticFS embed.FS
-	TMPL     *template.Template
+	StaticFS   embed.FS
+	TMPL       *template.Template
+	httpClient = &http.Client{
+		Timeout: 2 * time.Second,
+	}
 )
 
 func init() {
@@ -111,18 +114,18 @@ func (o *OpsServer) AdminData() http.Handler {
 				if member.Name == o.cluster.MemberList().LocalNode().Name {
 					continue
 				}
-				httpResp, err := http.Get("http://" + member.Addr.String() + ":20000/admin-data?proxy=true")
+				httpResp, err := httpClient.Get("http://" + member.Addr.String() + ":20000/admin-data?proxy=true")
 				if err != nil {
 					continue
 				}
-
-				var memberData Data
-				err = json.NewDecoder(httpResp.Body).Decode(&memberData)
-				if err != nil {
-					continue
-				}
-
-				membersAdminData = append(membersAdminData, memberData)
+				func() {
+					defer httpResp.Body.Close()
+					var memberData Data
+					if err := json.NewDecoder(httpResp.Body).Decode(&memberData); err != nil {
+						return
+					}
+					membersAdminData = append(membersAdminData, memberData)
+				}()
 			}
 
 			data.Others = membersAdminData

@@ -34,7 +34,7 @@ func main() {
 	if err != nil {
 		log.Println(err)
 
-		if errors.Is(err, clustering.FailedToCreateCluster) {
+		if errors.Is(err, clustering.ErrFailedToCreateCluster) {
 			log.Fatal("Failed to create cluster: ", err)
 		}
 	}

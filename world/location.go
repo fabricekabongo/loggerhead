@@ -11,11 +11,11 @@ import (
 )
 
 var (
-	LocationErrorRequiredId        = errors.New("location id is required")
-	LocationErrorInvalidLatitude   = errors.New("invalid latitude")
-	LocationErrorInvalidLongitude  = errors.New("invalid longitude")
-	LocationErrorRequiredNamespace = errors.New("namespace is required")
-	validationOps                  = promauto.NewCounter(prometheus.CounterOpts{
+	ErrLocationRequiredId        = errors.New("location id is required")
+	ErrLocationInvalidLatitude   = errors.New("invalid latitude")
+	ErrLocationInvalidLongitude  = errors.New("invalid longitude")
+	ErrLocationRequiredNamespace = errors.New("namespace is required")
+	validationOps                = promauto.NewCounter(prometheus.CounterOpts{
 		Name: "loggerhead_world_location_error",
 		Help: "Total failed location data validation",
 	})
@@ -37,11 +37,11 @@ type Location struct {
 func NewLocation(ns, id string, lat, lon float64) (*Location, error) {
 	if id == "" {
 		validationOps.Inc()
-		return nil, LocationErrorRequiredId
+		return nil, ErrLocationRequiredId
 	}
 	if ns == "" {
 		validationOps.Inc()
-		return nil, LocationErrorRequiredNamespace
+		return nil, ErrLocationRequiredNamespace
 	}
 
 	if err := validateLatLon(lat, lon); err != nil {
@@ -62,11 +62,11 @@ func NewLocation(ns, id string, lat, lon float64) (*Location, error) {
 func (*Location) init(ns, id string, lat, lon float64) (*Location, error) {
 	if id == "" {
 		validationOps.Inc()
-		return nil, LocationErrorRequiredId
+		return nil, ErrLocationRequiredId
 	}
 	if ns == "" {
 		validationOps.Inc()
-		return nil, LocationErrorRequiredNamespace
+		return nil, ErrLocationRequiredNamespace
 	}
 
 	if err := validateLatLon(lat, lon); err != nil {
@@ -102,12 +102,12 @@ func validateLatLon(lat, lon float64) error {
 
 	if lat < -90 || lat > 90 {
 		validationOps.Inc()
-		return LocationErrorInvalidLatitude
+		return ErrLocationInvalidLatitude
 	}
 
 	if lon < -180 || lon > 180 {
 		validationOps.Inc()
-		return LocationErrorInvalidLongitude
+		return ErrLocationInvalidLongitude
 	}
 
 	return nil

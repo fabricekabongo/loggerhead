@@ -46,8 +46,8 @@ func TestTree(t *testing.T) {
 			tree := NewQuadTree(-90, 90, -180, 180)
 
 			err := tree.Insert(nil)
-			if err != TreeErrLocationNil {
-				t.Fatalf("Expected TreeErrLocationNil, got %v", err)
+			if err != ErrTreeLocationNil {
+				t.Fatalf("Expected ErrTreeLocationNil, got %v", err)
 			}
 		})
 		t.Run("Should insert a location", func(t *testing.T) {

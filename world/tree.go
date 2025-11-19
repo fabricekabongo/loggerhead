@@ -55,7 +55,7 @@ func NewQuadTree(lat1, lat2, lon1, lon2 float64) *QuadTree {
 
 func (q *QuadTree) Insert(location *Location) error {
 	if location == nil {
-		return TreeErrLocationNil
+		return ErrTreeLocationNil
 	}
 	return q.Root.insert(location)
 }
@@ -74,11 +74,11 @@ func NewTreeNode(lat1, lat2, lon1, lon2 float64, capacity int) *TreeNode {
 
 func (node *TreeNode) insert(location *Location) error {
 	if location == nil {
-		return TreeErrLocationNil
+		return ErrTreeLocationNil
 	}
 	// If the location is not within the bound, return
 	if !(node.Lon1 <= location.lon && location.lon <= node.Lon2 && node.Lat1 <= location.lat && location.lat <= node.Lat2) {
-		return TreeErrLocationOutOfBounds
+		return ErrTreeLocationOutOfBounds
 	}
 
 	node.mu.Lock()
@@ -86,11 +86,11 @@ func (node *TreeNode) insert(location *Location) error {
 
 	if node.IsDivided {
 		err := node.NW.insert(location)
-		if errors.Is(err, TreeErrLocationOutOfBounds) {
+		if errors.Is(err, ErrTreeLocationOutOfBounds) {
 			err = node.NE.insert(location)
-			if errors.Is(err, TreeErrLocationOutOfBounds) {
+			if errors.Is(err, ErrTreeLocationOutOfBounds) {
 				err = node.SW.insert(location)
-				if errors.Is(err, TreeErrLocationOutOfBounds) {
+				if errors.Is(err, ErrTreeLocationOutOfBounds) {
 					err = node.SE.insert(location)
 				}
 			}

@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	FailedToJoinCluster       = errors.New("failed to join cluster")
-	FailedToCreateCluster     = errors.New("failed to create cluster")
-	FailedToExtractIPsFromDNS = errors.New("failed to extract IPs from DNS")
+	ErrFailedToJoinCluster       = errors.New("failed to join cluster")
+	ErrFailedToCreateCluster     = errors.New("failed to create cluster")
+	ErrFailedToExtractIPsFromDNS = errors.New("failed to extract IPs from DNS")
 )
 
 type Cluster struct {
@@ -79,7 +79,7 @@ func NewCluster(engine *query.Engine, config config.Config) (*Cluster, error) {
 	mList, err := memberlist.Create(cfg)
 	if err != nil {
 		log.Println("Failed to create memberlist: ", err)
-		return nil, FailedToCreateCluster
+		return nil, ErrFailedToCreateCluster
 	}
 
 	cluster := &Cluster{
@@ -93,12 +93,12 @@ func NewCluster(engine *query.Engine, config config.Config) (*Cluster, error) {
 
 	clusterIPs, err := getClusterIPs(config)
 	if err != nil {
-		return cluster, FailedToExtractIPsFromDNS
+		return cluster, ErrFailedToExtractIPsFromDNS
 	}
 
 	_, err = mList.Join(clusterIPs)
 	if err != nil {
-		return cluster, FailedToJoinCluster
+		return cluster, ErrFailedToJoinCluster
 	}
 
 	return cluster, nil
@@ -112,7 +112,7 @@ func getClusterIPs(config config.Config) ([]string, error) {
 	} else {
 		ips, err := getIPsFromDomainName(config.ClusterDNS)
 		if err != nil {
-			return nil, FailedToExtractIPsFromDNS
+			return nil, ErrFailedToExtractIPsFromDNS
 		}
 
 		clusterIPs = ips

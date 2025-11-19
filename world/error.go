@@ -5,6 +5,6 @@ import (
 )
 
 var (
-	TreeErrLocationNil         = errors.New("insertion failed because location is nil")
-	TreeErrLocationOutOfBounds = errors.New("insertion failed because location is out of bounds")
+	ErrTreeLocationNil         = errors.New("insertion failed because location is nil")
+	ErrTreeLocationOutOfBounds = errors.New("insertion failed because location is out of bounds")
 )

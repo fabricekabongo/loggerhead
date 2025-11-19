@@ -69,8 +69,8 @@ func TestLocation(t *testing.T) {
 			t.Parallel()
 			loc, err := NewLocation("", "Hey", 0, 0)
 
-			if !errors.Is(err, LocationErrorRequiredNamespace) {
-				t.Errorf("expected error %v, got %v", LocationErrorRequiredId, err)
+			if !errors.Is(err, ErrLocationRequiredNamespace) {
+				t.Errorf("expected error %v, got %v", ErrLocationRequiredId, err)
 			}
 
 			if loc != nil {
@@ -81,8 +81,8 @@ func TestLocation(t *testing.T) {
 			t.Parallel()
 			loc, err := NewLocation("theNamespace", "", 0, 0)
 
-			if !errors.Is(err, LocationErrorRequiredId) {
-				t.Errorf("expected error %v, got %v", LocationErrorRequiredId, err)
+			if !errors.Is(err, ErrLocationRequiredId) {
+				t.Errorf("expected error %v, got %v", ErrLocationRequiredId, err)
 			}
 
 			if loc != nil {
@@ -94,8 +94,8 @@ func TestLocation(t *testing.T) {
 			t.Parallel()
 			loc, err := NewLocation("1", "id", -100, 0)
 
-			if !errors.Is(err, LocationErrorInvalidLatitude) {
-				t.Errorf("expected error %v, got %v", LocationErrorInvalidLatitude, err)
+			if !errors.Is(err, ErrLocationInvalidLatitude) {
+				t.Errorf("expected error %v, got %v", ErrLocationInvalidLatitude, err)
 			}
 
 			if loc != nil {
@@ -107,8 +107,8 @@ func TestLocation(t *testing.T) {
 			t.Parallel()
 			loc, err := NewLocation("1", "id", 0, 200)
 
-			if !errors.Is(err, LocationErrorInvalidLongitude) {
-				t.Errorf("expected error %v, got %v", LocationErrorInvalidLongitude, err)
+			if !errors.Is(err, ErrLocationInvalidLongitude) {
+				t.Errorf("expected error %v, got %v", ErrLocationInvalidLongitude, err)
 			}
 
 			if loc != nil {

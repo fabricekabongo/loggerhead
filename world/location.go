@@ -34,7 +34,7 @@ type Location struct {
 	Node      *TreeNode
 }
 
-func NewLocation(ns string, id string, lat float64, lon float64) (*Location, error) {
+func NewLocation(ns, id string, lat, lon float64) (*Location, error) {
 	if id == "" {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredId
@@ -59,7 +59,7 @@ func NewLocation(ns string, id string, lat float64, lon float64) (*Location, err
 	return loc, nil
 }
 
-func (*Location) init(ns string, id string, lat float64, lon float64) (*Location, error) {
+func (*Location) init(ns, id string, lat, lon float64) (*Location, error) {
 	if id == "" {
 		validationOps.Inc()
 		return nil, LocationErrorRequiredId
@@ -84,7 +84,7 @@ func (*Location) init(ns string, id string, lat float64, lon float64) (*Location
 	return loc, nil
 }
 
-func (l *Location) Update(lat float64, lon float64) error {
+func (l *Location) Update(lat, lon float64) error {
 	err := validateLatLon(lat, lon)
 
 	if err != nil {
@@ -98,7 +98,7 @@ func (l *Location) Update(lat float64, lon float64) error {
 	return nil
 }
 
-func validateLatLon(lat float64, lon float64) error {
+func validateLatLon(lat, lon float64) error {
 
 	if lat < -90 || lat > 90 {
 		validationOps.Inc()

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -18,6 +19,8 @@ import (
 )
 
 func main() {
+
+	ctx := context.Background()
 	start := time.Now()
 	cfg := config.GetConfig()
 
@@ -43,7 +46,8 @@ func main() {
 		}
 	}(cluster)
 
-	clusterEngine := clustering.NewEngineDecorator(cluster, writeEngine)
+	ClusterCtx, concel := context.WithCancel(ctx)
+	clusterEngine := clustering.NewEngineDecorator(ClusterCtx, cluster, writeEngine)
 
 	opsServer := admin.NewOpsServer(cluster, cfg)
 	go opsServer.Start()
@@ -58,22 +62,21 @@ func main() {
 
 	printWelcomeMessage(cfg, cluster)
 	sigc := make(chan os.Signal, 1)
-	signal.Notify(sigc,
-		syscall.SIGHUP,
-		syscall.SIGINT,
-		syscall.SIGTERM,
-		syscall.SIGQUIT)
-	go func() {
+	signal.Notify(sigc, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
+	go func(cancel context.CancelFunc) {
 		s := <-sigc
 		log.Println("Received signal: ", s)
 		svr.Stop()
 		close(sigc)
+		cancel()
+
 		err := cluster.Close(0)
 		if err != nil {
 			return
 		}
 		os.Exit(0)
-	}()
+	}(concel)
 
 	end := time.Now()
 	fmt.Println("Startup time: ", end.Sub(start))

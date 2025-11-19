@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	NamespaceErrorNotFound     = errors.New("namespace not found")
-	ErrFailedToCreateNamespace = errors.New("failed to create namespace")
+	ErrUnexpectedNilNamespace = errors.New("failed to create namespace")
 )
 
 type Stats struct {
@@ -38,7 +37,7 @@ func NewWorld() *World {
 func (m *World) Delete(ns string, locId string) {
 	namespace := m.getNamespace(ns)
 	if namespace == nil {
-		panic(NamespaceErrorNotFound)
+		panic(ErrUnexpectedNilNamespace)
 	}
 
 	namespace.DeleteLocation(locId)
@@ -49,7 +48,7 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		panic(NamespaceErrorNotFound)
+		panic(ErrUnexpectedNilNamespace)
 	}
 
 	_, err := namespace.SaveLocation(locId, lat, lon)
@@ -69,7 +68,7 @@ func (m *World) getNamespace(ns string) *Namespace {
 
 	if namespace == nil {
 		m.mu.Unlock()
-		panic(ErrFailedToCreateNamespace)
+		panic(ErrUnexpectedNilNamespace)
 	}
 
 	m.mu.Unlock()
@@ -122,7 +121,7 @@ func (m *World) GetLocation(ns string, id string) (Location, bool) {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		panic(NamespaceErrorNotFound)
+		panic(ErrUnexpectedNilNamespace)
 	}
 
 	location, ok := namespace.GetLocation(id)
@@ -137,7 +136,7 @@ func (m *World) QueryRange(ns string, lat1, lat2, lon1, lon2 float64) []*Locatio
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		panic(NamespaceErrorNotFound)
+		panic(ErrUnexpectedNilNamespace)
 	}
 
 	return namespace.QueryRange(lat1, lat2, lon1, lon2)

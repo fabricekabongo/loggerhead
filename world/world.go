@@ -33,7 +33,7 @@ func NewWorld() *World {
 	}
 }
 
-func (m *World) Delete(ns string, locId string) {
+func (m *World) Delete(ns, locId string) {
 	namespace := m.getNamespace(ns)
 	if namespace == nil {
 		panic(ErrUnexpectedNilNamespace)
@@ -43,7 +43,7 @@ func (m *World) Delete(ns string, locId string) {
 }
 
 // Save a location to the world. If the location already exists, it will be updated.
-func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
+func (m *World) Save(ns, locId string, lat, lon float64) error {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
@@ -116,7 +116,7 @@ func (m *World) Merge(w *World) {
 	}
 }
 
-func (m *World) GetLocation(ns string, id string) (Location, bool) {
+func (m *World) GetLocation(ns, id string) (Location, bool) {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {

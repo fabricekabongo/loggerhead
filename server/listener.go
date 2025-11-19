@@ -25,7 +25,7 @@ type Handler struct {
 	maxEOFWait     time.Duration
 }
 
-func NewListener(port int, maxConn int, maxEOF time.Duration, engine query.EngineInterface) *Listener {
+func NewListener(port, maxConn int, maxEOF time.Duration, engine query.EngineInterface) *Listener {
 	return &Listener{
 		Port: port,
 		Handler: &Handler{

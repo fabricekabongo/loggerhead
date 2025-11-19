@@ -25,7 +25,7 @@ func NewNamespace(name string) *Namespace {
 	}
 }
 
-func (n *Namespace) SaveLocation(id string, lat float64, lon float64) (*Location, error) {
+func (n *Namespace) SaveLocation(id string, lat, lon float64) (*Location, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 

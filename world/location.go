@@ -140,7 +140,3 @@ func (l *Location) Lon() float64 {
 func (l *Location) Ns() string {
 	return l.ns
 }
-
-func (l *Location) UpdatedAt() time.Time {
-	return l.updatedAt
-}

@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	NamespaceErrorNotFound = errors.New("namespace not found")
+	NamespaceErrorNotFound     = errors.New("namespace not found")
+	ErrFailedToCreateNamespace = errors.New("failed to create namespace")
 )
 
 type Stats struct {
@@ -36,9 +37,8 @@ func NewWorld() *World {
 
 func (m *World) Delete(ns string, locId string) {
 	namespace := m.getNamespace(ns)
-
 	if namespace == nil {
-		return
+		panic(NamespaceErrorNotFound)
 	}
 
 	namespace.DeleteLocation(locId)
@@ -49,7 +49,7 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		return NamespaceErrorNotFound
+		panic(NamespaceErrorNotFound)
 	}
 
 	_, err := namespace.SaveLocation(locId, lat, lon)
@@ -58,16 +58,21 @@ func (m *World) Save(ns string, locId string, lat float64, lon float64) error {
 }
 
 func (m *World) getNamespace(ns string) *Namespace {
-	m.mu.RLock()
+	m.mu.Lock()
+
 	namespace, ok := m.namespaces[ns]
-	m.mu.RUnlock()
 
 	if !ok {
 		namespace = NewNamespace(ns)
-		m.mu.Lock()
 		m.namespaces[ns] = namespace
-		m.mu.Unlock()
 	}
+
+	if namespace == nil {
+		m.mu.Unlock()
+		panic(ErrFailedToCreateNamespace)
+	}
+
+	m.mu.Unlock()
 
 	return namespace
 }
@@ -102,6 +107,7 @@ func NewWorldFromBytes(buf []byte) *World {
 func (m *World) Merge(w *World) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
+
 	for ns, n := range w.namespaces {
 		for locId, loc := range n.locations {
 			err := m.Save(ns, locId, loc.Lat(), loc.Lon())
@@ -116,7 +122,7 @@ func (m *World) GetLocation(ns string, id string) (Location, bool) {
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		return Location{}, false
+		panic(NamespaceErrorNotFound)
 	}
 
 	location, ok := namespace.GetLocation(id)
@@ -131,7 +137,7 @@ func (m *World) QueryRange(ns string, lat1, lat2, lon1, lon2 float64) []*Locatio
 	namespace := m.getNamespace(ns)
 
 	if namespace == nil {
-		return []*Location{}
+		panic(NamespaceErrorNotFound)
 	}
 
 	return namespace.QueryRange(lat1, lat2, lon1, lon2)

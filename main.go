@@ -32,10 +32,10 @@ func main() {
 	cluster, err := clustering.NewCluster(writeEngine, cfg)
 
 	if err != nil {
+		log.Println(err)
+
 		if errors.Is(err, clustering.FailedToCreateCluster) {
 			log.Fatal("Failed to create cluster: ", err)
-		} else {
-			log.Println(err)
 		}
 	}
 

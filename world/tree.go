@@ -35,7 +35,7 @@ type TreeNode struct {
 	IsDivided bool
 }
 
-func NewQuadTree(lat1 float64, lat2 float64, lon1 float64, lon2 float64) *QuadTree {
+func NewQuadTree(lat1, lat2, lon1, lon2 float64) *QuadTree {
 	qt := &QuadTree{
 		Root: &TreeNode{
 			IsDivided: false,
@@ -60,7 +60,7 @@ func (q *QuadTree) Insert(location *Location) error {
 	return q.Root.insert(location)
 }
 
-func NewTreeNode(lat1 float64, lat2 float64, lon1 float64, lon2 float64, capacity int) *TreeNode {
+func NewTreeNode(lat1, lat2, lon1, lon2 float64, capacity int) *TreeNode {
 	return &TreeNode{
 		IsDivided: false,
 		Capacity:  capacity,
@@ -157,11 +157,11 @@ func (*QuadTree) reBalance() {
 	// TODO: Implement rebalancing
 }
 
-func rectangleOverlap(lat1 float64, lat2 float64, lon1 float64, lon2 float64, lat3 float64, lat4 float64, lon3 float64, lon4 float64) bool {
+func rectangleOverlap(lat1, lat2, lon1, lon2, lat3, lat4, lon3, lon4 float64) bool {
 	return math.Max(lat1, lat3) < math.Min(lat2, lat4) && math.Max(lon1, lon3) < math.Min(lon2, lon4)
 }
 
-func (node *TreeNode) QueryRange(lat1 float64, lat2 float64, lon1 float64, lon2 float64) []*Location {
+func (node *TreeNode) QueryRange(lat1, lat2, lon1, lon2 float64) []*Location {
 
 	var locations []*Location
 

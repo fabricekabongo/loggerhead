@@ -114,9 +114,11 @@ func validateLatLon(lat float64, lon float64) error {
 }
 
 func (l *Location) SetNode(node *TreeNode) {
-	l.Node.mu.Lock()
+	if node == nil {
+		panic("cannot set nil node to location")
+	}
+
 	l.Node = node
-	l.Node.mu.Unlock()
 }
 
 func (l *Location) String() string {

@@ -2,14 +2,15 @@ package server
 
 import (
 	"errors"
-	"github.com/ataul443/memnet"
-	"github.com/fabricekabongo/loggerhead/query"
-	"github.com/fabricekabongo/loggerhead/world"
 	"math/rand/v2"
 	"net"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/ataul443/memnet"
+	"github.com/fabricekabongo/loggerhead/query"
+	"github.com/fabricekabongo/loggerhead/world"
 )
 
 type testEngine string
@@ -22,7 +23,7 @@ type errListener struct {
 	closed bool
 }
 
-func (errListener) Accept() (net.Conn, error) {
+func (*errListener) Accept() (net.Conn, error) {
 	return nil, errors.New("accept failed")
 }
 
@@ -31,7 +32,7 @@ func (l *errListener) Close() error {
 	return nil
 }
 
-func (errListener) Addr() net.Addr { return nil }
+func (*errListener) Addr() net.Addr { return nil }
 
 func CreateRandomLocation(seed int) (string, string, float64, float64) {
 	lat := -90.0 + rand.Float64()*(90.0+90.0)

@@ -11,6 +11,7 @@ import (
 
 	"github.com/fabricekabongo/loggerhead/clustering"
 	"github.com/fabricekabongo/loggerhead/config"
+	"github.com/hashicorp/memberlist"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
@@ -35,11 +36,43 @@ func init() {
 }
 
 type OpsServer struct {
-	cluster *clustering.Cluster
+	cluster Cluster
 	cfg     config.Config
 }
 
-func NewOpsServer(cluster *clustering.Cluster, cfg config.Config) *OpsServer {
+type Cluster interface {
+	MemberList() MemberListProvider
+	Broadcasts() BroadcastQueue
+}
+
+type MemberListProvider interface {
+	LocalNode() *memberlist.Node
+	NumMembers() int
+	Members() []*memberlist.Node
+	GetHealthScore() int
+}
+
+type BroadcastQueue interface {
+	NumQueued() int
+}
+
+type clusterAdapter struct {
+	cluster *clustering.Cluster
+}
+
+func NewClusterAdapter(cluster *clustering.Cluster) Cluster {
+	return clusterAdapter{cluster: cluster}
+}
+
+func (c clusterAdapter) MemberList() MemberListProvider {
+	return c.cluster.MemberList()
+}
+
+func (c clusterAdapter) Broadcasts() BroadcastQueue {
+	return c.cluster.Broadcasts()
+}
+
+func NewOpsServer(cluster Cluster, cfg config.Config) *OpsServer {
 	return &OpsServer{
 		cluster: cluster,
 		cfg:     cfg,

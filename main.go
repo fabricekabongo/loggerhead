@@ -16,7 +16,24 @@ import (
 	"github.com/fabricekabongo/loggerhead/query"
 	"github.com/fabricekabongo/loggerhead/server"
 	"github.com/fabricekabongo/loggerhead/world"
+	"github.com/hashicorp/memberlist"
 )
+
+type nodeInfoProvider interface {
+	LocalNode() *memberlist.Node
+}
+
+type clusterInfo interface {
+	MemberList() nodeInfoProvider
+}
+
+type clusterAdapter struct {
+	cluster *clustering.Cluster
+}
+
+func (c clusterAdapter) MemberList() nodeInfoProvider {
+	return c.cluster.MemberList()
+}
 
 func main() {
 
@@ -60,7 +77,7 @@ func main() {
 
 	defer svr.Stop()
 
-	printWelcomeMessage(cfg, cluster)
+	printWelcomeMessage(cfg, clusterAdapter{cluster: cluster})
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 
@@ -83,7 +100,7 @@ func main() {
 	svr.Start()
 }
 
-func printWelcomeMessage(cfg config.Config, cluster *clustering.Cluster) {
+func printWelcomeMessage(cfg config.Config, cluster clusterInfo) {
 	fmt.Println("===========================================================")
 	fmt.Println("Starting the Database Server")
 	fmt.Println("===========================================================")

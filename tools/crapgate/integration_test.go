@@ -357,6 +357,92 @@ func TestRunPreservesBaseCRAPAcrossModifiedSourceRename(t *testing.T) {
 	})
 }
 
+func TestMovedFunctionKeepsUniqueBaseIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		modifyBody  bool
+		wantChanged bool
+	}{
+		{name: "unchanged legacy move"},
+		{name: "modified move uses changed policy", modifyBody: true, wantChanged: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertMovedFunctionPolicy(t, tc)
+		})
+	}
+}
+
+func TestMovedFunctionAliasRejectsAmbiguousSymbol(t *testing.T) {
+	base := map[functionID]string{
+		{Package: "sample", File: "pkg/one.go", Name: "Legacy"}: "func Legacy() {}",
+		{Package: "sample", File: "pkg/two.go", Name: "Legacy"}: "func Legacy() {}",
+	}
+	head := map[functionID]string{{Package: "sample", File: "pkg/three.go", Name: "Legacy"}: "func Legacy() {}"}
+	if err := addMovedFunctionAliases(base, head, map[functionID]functionID{}); err == nil || !strings.Contains(err.Error(), "ambiguous moved function identity") {
+		t.Fatalf("ambiguous move error = %v", err)
+	}
+}
+
+func assertMovedFunctionPolicy(t *testing.T, tc struct {
+	name        string
+	modifyBody  bool
+	wantChanged bool
+}) {
+	t.Helper()
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/old.go", "package sample\nfunc Legacy() int { return 1 }\nfunc OldRetained() {}\n")
+	writeTestFile(t, repo, "pkg/target.go", "package sample\nfunc TargetRetained() {}\n")
+	commitTestRepository(t, repo, "base files")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if err := os.WriteFile(filepath.Join(repo, "pkg", "old.go"), []byte("package sample\nfunc OldRetained() {}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	legacyBody := "return 1"
+	if tc.modifyBody {
+		legacyBody = "return 2"
+	}
+	writeTestFile(t, repo, "pkg/target.go", "package sample\nfunc Legacy() int { "+legacyBody+" }\nfunc TargetRetained() {}\n")
+	commitTestRepository(t, repo, "move function")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil {
+			t.Fatalf("collect moved function: %v", err)
+		}
+		newID := functionID{Package: "sample", File: "pkg/target.go", Name: "Legacy"}
+		oldID := functionID{Package: "sample", File: "pkg/old.go", Name: "Legacy"}
+		if changed.renamedBaseIDs[newID] != oldID {
+			t.Fatalf("moved function base identity = %v, want %v", changed.renamedBaseIDs[newID], oldID)
+		}
+		baseReport := movedFunctionReport(t, "pkg/old.go", 15, 11)
+		headCRAP, headCC := 15.0, 11
+		if tc.modifyBody {
+			headCRAP, headCC = 14, 10
+		}
+		headReport := movedFunctionReport(t, "pkg/target.go", headCRAP, headCC)
+		var output strings.Builder
+		err = run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, &output)
+		if err != nil {
+			t.Fatalf("moved function policy: %v\n%s", err, output.String())
+		}
+		if tc.wantChanged && !strings.Contains(output.String(), "changed sample/pkg/target.go:Legacy CRAP base=15 head=14") {
+			t.Fatalf("modified moved function did not use changed policy: %s", output.String())
+		}
+		if strings.Contains(output.String(), "new sample/pkg/target.go:Legacy") {
+			t.Fatalf("moved function classified as new: %s", output.String())
+		}
+	})
+}
+
+func movedFunctionReport(t *testing.T, path string, legacyCRAP float64, legacyCC int) string {
+	t.Helper()
+	legacy := reportEntry(path, "Legacy", legacyCRAP)
+	legacy.Cyclomatic = intPtr(legacyCC)
+	return writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+		legacy, reportEntry("pkg/old.go", "OldRetained", 1), reportEntry("pkg/target.go", "TargetRetained", 1),
+	}})
+}
+
 func assertModifiedRenameDiff(t *testing.T, baseRef, headRef string) {
 	t.Helper()
 	files, err := changedFiles(baseRef, headRef)

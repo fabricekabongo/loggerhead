@@ -34,6 +34,12 @@ type changedFunctionSet struct {
 	testOnly       bool
 }
 
+type functionSymbol struct {
+	packageName string
+	receiver    string
+	name        string
+}
+
 func main() {
 	log.SetFlags(0)
 	// Process termination cannot be reached by the in-process Go test harness.
@@ -176,7 +182,45 @@ func collectChangedFunctions(baseRef, headRef string) (changedFunctionSet, error
 			return changedFunctionSet{}, err
 		}
 	}
+	if err := addMovedFunctionAliases(baseFunctions, headFunctions, renamedBaseIDs); err != nil {
+		return changedFunctionSet{}, err
+	}
 	return changedFunctionSet{base: baseFunctions, head: headFunctions, renamedBaseIDs: renamedBaseIDs, testOnly: testOnly}, nil
+}
+
+func addMovedFunctionAliases(base, head map[functionID]string, aliases map[functionID]functionID) error {
+	baseSymbols := indexFunctionSymbols(base)
+	headSymbols := indexFunctionSymbols(head)
+	for id := range head {
+		if _, exists := base[id]; exists {
+			continue
+		}
+		symbol := symbolFor(id)
+		candidates := baseSymbols[symbol]
+		if len(candidates) == 0 {
+			continue
+		}
+		if len(candidates) != 1 || len(headSymbols[symbol]) != 1 {
+			return fmt.Errorf("ambiguous moved function identity %s", id)
+		}
+		if _, exists := aliases[id]; !exists {
+			aliases[id] = candidates[0]
+		}
+	}
+	return nil
+}
+
+func indexFunctionSymbols(functions map[functionID]string) map[functionSymbol][]functionID {
+	indexed := make(map[functionSymbol][]functionID)
+	for id := range functions {
+		symbol := symbolFor(id)
+		indexed[symbol] = append(indexed[symbol], id)
+	}
+	return indexed
+}
+
+func symbolFor(id functionID) functionSymbol {
+	return functionSymbol{packageName: id.Package, receiver: id.Receiver, name: id.Name}
 }
 
 func isTestOnlyChange(file changedFile) bool {

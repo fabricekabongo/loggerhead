@@ -184,6 +184,13 @@ func normalizeReportedPath(path string) string {
 
 func parseFunctions(filename, packageName string, source []byte) (map[functionID]string, error) {
 	fset := token.NewFileSet()
+	packageFile, err := parser.ParseFile(fset, filename, source, parser.PackageClauseOnly)
+	if err != nil {
+		return nil, fmt.Errorf("parse %s: %w", filename, err)
+	}
+	if packageFile.Name.Name == "documentation" {
+		return map[functionID]string{}, nil
+	}
 	file, err := parser.ParseFile(fset, filename, source, 0)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", filename, err)
@@ -237,7 +244,14 @@ func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, 
 		if !found {
 			return nil, fmt.Errorf("head CRAP report missing function %s", id)
 		}
+		baseID := id
+		if renamedID, renamed := renamedBaseIDs[id]; renamed {
+			baseID = renamedID
+		}
 		baseBody, existed := baseFunctions[id]
+		if !existed && baseID != id {
+			baseBody, existed = baseFunctions[baseID]
+		}
 		if !existed {
 			allowed := *headEntry.CRAP <= maxCRAP && *headEntry.Cyclomatic <= maxCyclomatic
 			reason := "new function must have CRAP <= 10 and cyclomatic complexity <= 10"
@@ -246,10 +260,6 @@ func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, 
 		}
 		if body == baseBody {
 			continue
-		}
-		baseID := id
-		if renamedID, renamed := renamedBaseIDs[id]; renamed {
-			baseID = renamedID
 		}
 		baseEntry, found := findEntry(base, baseID)
 		if !found {
@@ -273,7 +283,7 @@ func evaluateUnaffectedCRAPChanges(base, head map[functionID]entry, baseFunction
 			baseID = renamedID
 		}
 		baseEntry, exists := base[baseID]
-		if !exists || productionFunctionChanged(id, baseFunctions, headFunctions) {
+		if !exists || productionFunctionChanged(id, baseFunctions, headFunctions, renamedBaseIDs) {
 			continue
 		}
 		item, changed := testOnlyCRAPResult(id, baseEntry, headEntry)
@@ -285,12 +295,17 @@ func evaluateUnaffectedCRAPChanges(base, head map[functionID]entry, baseFunction
 	return results, nil
 }
 
-func productionFunctionChanged(id functionID, baseFunctions, headFunctions map[functionID]string) bool {
+func productionFunctionChanged(id functionID, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) bool {
 	headBody, changedFile := headFunctions[id]
 	if !changedFile {
 		return false
 	}
 	baseBody, existed := baseFunctions[id]
+	if !existed {
+		if baseID, renamed := renamedBaseIDs[id]; renamed {
+			baseBody, existed = baseFunctions[baseID]
+		}
+	}
 	return !existed || baseBody != headBody
 }
 

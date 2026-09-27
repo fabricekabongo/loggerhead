@@ -174,7 +174,7 @@ func collectChangedFunctions(baseRef, headRef string) (changedFunctionSet, error
 		if !isTestOnlyChange(file) {
 			testOnly = false
 		}
-		if strings.HasSuffix(file.path, "_test.go") {
+		if strings.HasSuffix(file.path, "_test.go") || strings.HasSuffix(file.oldPath, "_test.go") {
 			testsChanged = true
 		}
 		if err := collectOneFile(file, baseRef, headRef, baseFunctions, headFunctions, renamedBaseIDs); err != nil {

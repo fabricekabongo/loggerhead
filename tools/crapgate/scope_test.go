@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -19,6 +20,32 @@ func TestModifiedFileLeavingDefaultBuildFailsClosed(t *testing.T) {
 		_, err := collectChangedFunctions(baseRef, headRef)
 		if err == nil || !strings.Contains(err.Error(), "left the default build") {
 			t.Fatalf("scope change error = %v", err)
+		}
+	})
+}
+
+func TestRenamedAwayTestStillChecksCoverageRegression(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() int { return 1 }\n")
+	writeTestFile(t, repo, "pkg/service_test.go", "package sample\nfunc TestStable() { _ = Stable() }\n")
+	commitTestRepository(t, repo, "base with test")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if err := os.Remove(filepath.Join(repo, "pkg", "service_test.go")); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, repo, "pkg/testdata/service.go", "package sample\nfunc TestStable() { _ = Stable() }\n")
+	commitTestRepository(t, repo, "move test out of build")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil || !changed.testsChanged {
+			t.Fatalf("renamed-away test classification = %t, err=%v", changed.testsChanged, err)
+		}
+		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 11)}})
+		headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 12)}})
+		err = run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, io.Discard)
+		if err == nil || !strings.Contains(err.Error(), "CRAP policy failed") {
+			t.Fatalf("test coverage regression after rename error = %v", err)
 		}
 	})
 }

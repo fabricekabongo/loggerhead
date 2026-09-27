@@ -1,0 +1,93 @@
+name: Go lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: go-lint-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version: '1.24.3'
+          cache: false
+
+      - name: Download pinned golangci-lint
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/golangci-lint.tar.gz"
+          curl --fail --location --silent --show-error --retry 2 --max-time 60 \
+            'https://github.com/golangci/golangci-lint/releases/download/v2.14.0/golangci-lint-2.14.0-linux-amd64.tar.gz' \
+            --output "$archive"
+          echo 'ab90aeb7b066f92a33415b638a50fe5344bbb75a0d32ad30cc248d88f81032ab  '"$archive" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/golangci-lint"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/golangci-lint" --strip-components=1
+
+      - name: Lint changed code
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          lint=("$RUNNER_TEMP/golangci-lint/golangci-lint" run --modules-download-mode=vendor --timeout=5m)
+          if [[ "$base_sha" =~ ^0+$ ]]; then
+            echo 'No prior commit available; linting full repository.'
+          else
+            lint+=(--new-from-rev="$base_sha")
+          fi
+          "${lint[@]}" ./...
+
+      - name: Check changed Go files with gofmt and goimports
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == pull_request ]]; then
+            base_sha="$PR_BASE_SHA"
+          else
+            base_sha="$PUSH_BEFORE_SHA"
+          fi
+
+          if [[ "$base_sha" =~ ^0+$ ]]; then
+            mapfile -t go_files < <(git ls-files -- '*.go')
+          else
+            mapfile -t go_files < <(git diff --diff-filter=ACMRT --name-only "$base_sha"...HEAD -- '*.go')
+          fi
+
+          for file in "${go_files[@]}"; do
+            formatted_file="$RUNNER_TEMP/go-format-output.go"
+            diff_file="$RUNNER_TEMP/go-format-diff"
+            "$RUNNER_TEMP/golangci-lint/golangci-lint" fmt --stdin < "$file" > "$formatted_file"
+            if ! diff --unified --strip-trailing-cr "$file" "$formatted_file" > "$diff_file"; then
+              cat "$diff_file"
+              echo "Formatting check failed for $file" >&2
+              exit 1
+            fi
+          done

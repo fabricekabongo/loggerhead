@@ -1,0 +1,53 @@
+version: "2"
+
+run:
+  timeout: 5m
+
+linters:
+  default: none
+  enable:
+    - govet
+    - staticcheck
+    - errcheck
+    - ineffassign
+    - unused
+    - revive
+    - errorlint
+    - gocritic
+    - gocyclo
+    - nolintlint
+  settings:
+    gocritic:
+      enabled-checks:
+        - appendCombine
+        - boolExprSimplify
+        - builtinShadow
+        - commentedOutCode
+        - dupImport
+        - emptyFallthrough
+        - equalFold
+        - nilValReturn
+        - octalLiteral
+        - regexpPattern
+        - sloppyReassign
+        - typeAssertChain
+        - unlabelStmt
+    gocyclo:
+      # gocyclo reports values at or above this number: 11 means > 10 fails.
+      min-complexity: 11
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/fabricekabongo/loggerhead
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

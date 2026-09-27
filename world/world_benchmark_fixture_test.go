@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 )
 
@@ -25,13 +27,28 @@ type benchmarkFixture struct {
 	points map[benchmarkKey]benchmarkPoint
 }
 
-const maxSequentialInsertOperations = 10_000
+const maxInsertBenchmarkOperations = 10_000
 
 func validateSequentialInsertCount(count int) error {
-	if count > maxSequentialInsertOperations {
-		return fmt.Errorf("NewInsert/Sequential b.N=%d exceeds hard limit %d; run with -benchtime=1000x (or smaller)", count, maxSequentialInsertOperations)
+	if count > maxInsertBenchmarkOperations {
+		return fmt.Errorf("NewInsert/Sequential b.N=%d exceeds hard limit %d; run with -benchtime=1000x (or smaller)", count, maxInsertBenchmarkOperations)
 	}
 	return nil
+}
+
+func validateParallelInsertCount(count int) error {
+	if count > maxInsertBenchmarkOperations {
+		return fmt.Errorf("NewInsert/Parallel b.N=%d exceeds hard limit %d; run with -benchtime=1000x (or smaller)", count, maxInsertBenchmarkOperations)
+	}
+	return nil
+}
+
+type benchmarkInsertAllocator struct {
+	next atomic.Uint64
+}
+
+func (allocator *benchmarkInsertAllocator) nextIndex() int {
+	return int(allocator.next.Add(1) - 1)
 }
 
 func newBenchmarkFixture(points []benchmarkPoint) (*benchmarkFixture, error) {
@@ -155,11 +172,59 @@ func TestBenchmarkFixtureUsesCompositeIdentity(t *testing.T) {
 }
 
 func TestSequentialInsertBenchmarkCountLimit(t *testing.T) {
-	if err := validateSequentialInsertCount(maxSequentialInsertOperations); err != nil {
+	if err := validateSequentialInsertCount(maxInsertBenchmarkOperations); err != nil {
 		t.Fatalf("hard limit rejected: %v", err)
 	}
-	if err := validateSequentialInsertCount(maxSequentialInsertOperations + 1); err == nil {
+	if err := validateSequentialInsertCount(maxInsertBenchmarkOperations + 1); err == nil {
 		t.Fatal("count above hard limit accepted")
+	}
+}
+
+func TestParallelInsertBenchmarkCountLimit(t *testing.T) {
+	if err := validateParallelInsertCount(maxInsertBenchmarkOperations); err != nil {
+		t.Fatalf("hard limit rejected: %v", err)
+	}
+	if err := validateParallelInsertCount(maxInsertBenchmarkOperations + 1); err == nil {
+		t.Fatal("count above hard limit accepted")
+	}
+}
+
+func TestParallelInsertAllocatorAssignsUniqueIndexes(t *testing.T) {
+	const (
+		workers             = 16
+		operationsPerWorker = 256
+	)
+	allocator := &benchmarkInsertAllocator{}
+	seen := make([]bool, workers*operationsPerWorker)
+	var seenMu sync.Mutex
+	var wait sync.WaitGroup
+	wait.Add(workers)
+	for range workers {
+		go func() {
+			defer wait.Done()
+			for range operationsPerWorker {
+				index := allocator.nextIndex()
+				if index < 0 || index >= len(seen) {
+					t.Errorf("allocated index %d outside [0,%d)", index, len(seen))
+					continue
+				}
+				seenMu.Lock()
+				if seen[index] {
+					t.Errorf("allocated duplicate index %d", index)
+				}
+				seen[index] = true
+				seenMu.Unlock()
+			}
+		}()
+	}
+	wait.Wait()
+	for index, allocated := range seen {
+		if !allocated {
+			t.Errorf("index %d was not allocated", index)
+		}
+	}
+	if got := allocator.next.Load(); got != uint64(len(seen)) {
+		t.Errorf("allocator count = %d, want %d", got, len(seen))
 	}
 }
 
@@ -190,6 +255,46 @@ func TestBenchmarkSpatialMembershipDetectsWrongLeaf(t *testing.T) {
 }
 
 func BenchmarkWorldSave(b *testing.B) {
+	b.Run("NewInsert/Parallel", func(b *testing.B) {
+		const seed = 2403
+		if err := validateParallelInsertCount(b.N); err != nil {
+			b.Fatal(err)
+		}
+		points := benchmarkPoints(seed, b.N)
+		world := NewWorld()
+		var allocator benchmarkInsertAllocator
+		var callbackWorkers atomic.Uint64
+		var firstError error
+		var errorOnce sync.Once
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			callbackWorkers.Add(1)
+			for pb.Next() {
+				index := allocator.nextIndex()
+				point := points[index]
+				if err := world.Save(point.namespace, point.id, point.lat, point.lon); err != nil {
+					errorOnce.Do(func() {
+						firstError = fmt.Errorf("insert (%q, %q): %w", point.namespace, point.id, err)
+					})
+				}
+			}
+		})
+		b.StopTimer()
+
+		if firstError != nil {
+			b.Fatal(firstError)
+		}
+		if got := allocator.next.Load(); got != uint64(b.N) {
+			b.Fatalf("allocated operations = %d, want %d", got, b.N)
+		}
+		verifyBenchmarkWorld(b, world, points)
+		b.ReportMetric(float64(seed), "seed")
+		b.ReportMetric(float64(len(points)), "entities")
+		b.ReportMetric(float64(callbackWorkers.Load()), "callback-workers")
+	})
+
 	b.Run("NewInsert/Sequential", func(b *testing.B) {
 		const seed = 2401
 		if err := validateSequentialInsertCount(b.N); err != nil {

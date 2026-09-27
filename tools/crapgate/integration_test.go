@@ -501,8 +501,8 @@ func TestMixedProductionAndTestChangesCheckUnaffectedCRAP(t *testing.T) {
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
 		changed, err := collectChangedFunctions(baseRef, headRef)
-		if err != nil || changed.testOnly || !changed.testsChanged {
-			t.Fatalf("mixed diff classification: testOnly=%t testsChanged=%t err=%v", changed.testOnly, changed.testsChanged, err)
+		if err != nil || changed.testOnly {
+			t.Fatalf("mixed diff classification: testOnly=%t err=%v", changed.testOnly, err)
 		}
 		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
 			reportEntry("pkg/service.go", "Changed", 2), reportEntry("pkg/service.go", "Legacy", 11),
@@ -519,6 +519,28 @@ func TestMixedProductionAndTestChangesCheckUnaffectedCRAP(t *testing.T) {
 			strings.Count(output.String(), "\ncoverage sample/pkg/service.go:Legacy ") != 1 ||
 			strings.Contains(output.String(), "\ncoverage sample/pkg/service.go:Changed ") {
 			t.Fatalf("mixed diff results duplicated or omitted function: %s", output.String())
+		}
+	})
+}
+
+func TestNonGoFixtureChangesCheckUnchangedCRAP(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Legacy() int { return 7 }\n")
+	writeTestFile(t, repo, "pkg/testdata/input.json", "{\"case\":\"base\"}\n")
+	commitTestRepository(t, repo, "base")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	writeTestFile(t, repo, "pkg/testdata/input.json", "{\"case\":\"changed\"}\n")
+	commitTestRepository(t, repo, "fixture change")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil || len(changed.base) != 0 || len(changed.head) != 0 || changed.testOnly {
+			t.Fatalf("fixture-only source inventory = %#v, err=%v", changed, err)
+		}
+		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Legacy", 11)}})
+		headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Legacy", 12)}})
+		if err := run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, io.Discard); err == nil {
+			t.Fatal("worsened CRAP passed after non-Go fixture change")
 		}
 	})
 }

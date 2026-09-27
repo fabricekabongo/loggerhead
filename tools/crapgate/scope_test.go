@@ -38,8 +38,8 @@ func TestRenamedAwayTestStillChecksCoverageRegression(t *testing.T) {
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
 		changed, err := collectChangedFunctions(baseRef, headRef)
-		if err != nil || !changed.testsChanged {
-			t.Fatalf("renamed-away test classification = %t, err=%v", changed.testsChanged, err)
+		if err != nil || len(changed.base) != 0 || len(changed.head) != 0 {
+			t.Fatalf("renamed-away test inventory = %#v, err=%v", changed, err)
 		}
 		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 11)}})
 		headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 12)}})

@@ -32,7 +32,6 @@ type changedFunctionSet struct {
 	head           map[functionID]string
 	renamedBaseIDs map[functionID]functionID
 	testOnly       bool
-	testsChanged   bool
 }
 
 func main() {
@@ -86,7 +85,7 @@ func run(config options, output io.Writer) error {
 		results, err = evaluateTestOnlyCRAPChanges(base, head)
 	} else {
 		results, err = evaluateWithRenamedBaseIDs(base, head, changed.base, changed.head, changed.renamedBaseIDs)
-		if err == nil && changed.testsChanged {
+		if err == nil {
 			var testResults []result
 			testResults, err = evaluateUnaffectedCRAPChanges(base, head, changed.base, changed.head, changed.renamedBaseIDs)
 			results = append(results, testResults...)
@@ -169,19 +168,15 @@ func collectChangedFunctions(baseRef, headRef string) (changedFunctionSet, error
 	headFunctions := make(map[functionID]string)
 	renamedBaseIDs := make(map[functionID]functionID)
 	testOnly := len(files) > 0
-	testsChanged := false
 	for _, file := range files {
 		if !isTestOnlyChange(file) {
 			testOnly = false
-		}
-		if strings.HasSuffix(file.path, "_test.go") || strings.HasSuffix(file.oldPath, "_test.go") {
-			testsChanged = true
 		}
 		if err := collectOneFile(file, baseRef, headRef, baseFunctions, headFunctions, renamedBaseIDs); err != nil {
 			return changedFunctionSet{}, err
 		}
 	}
-	return changedFunctionSet{base: baseFunctions, head: headFunctions, renamedBaseIDs: renamedBaseIDs, testOnly: testOnly, testsChanged: testsChanged}, nil
+	return changedFunctionSet{base: baseFunctions, head: headFunctions, renamedBaseIDs: renamedBaseIDs, testOnly: testOnly}, nil
 }
 
 func isTestOnlyChange(file changedFile) bool {

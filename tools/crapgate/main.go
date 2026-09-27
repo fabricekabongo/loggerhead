@@ -328,12 +328,36 @@ func moduleContainsGoFile(ref, directory string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("list Go sources under nested module %s at %s: %w", directory, ref, err)
 	}
-	for _, path := range strings.Split(listing, "\n") {
-		if strings.HasSuffix(path, ".go") {
+	paths := strings.Split(listing, "\n")
+	nestedModules := nestedModuleDirectories(paths, directory)
+	for _, path := range paths {
+		if strings.HasSuffix(path, ".go") && !isWithinNestedModule(path, nestedModules) {
 			return true, nil
 		}
 	}
 	return false, nil
+}
+
+func nestedModuleDirectories(paths []string, directory string) map[string]struct{} {
+	nested := make(map[string]struct{})
+	for _, path := range paths {
+		if strings.HasSuffix(path, "/go.mod") {
+			moduleDir := filepath.ToSlash(filepath.Dir(path))
+			if moduleDir != directory && strings.HasPrefix(moduleDir, directory+"/") {
+				nested[moduleDir] = struct{}{}
+			}
+		}
+	}
+	return nested
+}
+
+func isWithinNestedModule(path string, nestedModules map[string]struct{}) bool {
+	for directory := range nestedModules {
+		if strings.HasPrefix(path, directory+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func moduleChangePath(file changedFile) string {
@@ -377,7 +401,11 @@ func collectRenamedBase(file changedFile, baseRef string, functions map[function
 	if !isProductionGoPath(file.oldPath) {
 		return false, nil
 	}
-	return collectRenamedSource(functions, baseRef, file.oldPath, file.path, aliases)
+	identityPath := file.path
+	if !samePackageDirectory(file.oldPath, file.path) {
+		identityPath = file.oldPath
+	}
+	return collectRenamedSource(functions, baseRef, file.oldPath, identityPath, aliases)
 }
 
 func collectRenamedHead(file changedFile, headRef string, functions map[functionID]string, baseIncluded bool) (bool, error) {
@@ -547,13 +575,17 @@ func addFileFunctionsAt(dst map[functionID]string, ref, sourcePath, identityPath
 	}
 	for id, declaration := range functions {
 		dst[id] = declaration
-		if sourcePath != identityPath && aliases != nil {
+		if sourcePath != identityPath && aliases != nil && samePackageDirectory(sourcePath, identityPath) {
 			baseID := id
 			baseID.File = normalizeReportedPath(sourcePath)
 			aliases[id] = baseID
 		}
 	}
 	return nil
+}
+
+func samePackageDirectory(first, second string) bool {
+	return filepath.ToSlash(filepath.Dir(first)) == filepath.ToSlash(filepath.Dir(second))
 }
 
 func fileInLinuxDefaultBuild(path string, source []byte) (bool, error) {

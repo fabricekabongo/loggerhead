@@ -345,6 +345,28 @@ func TestDeletingNestedModuleAndAllGoSourcesIsIgnored(t *testing.T) {
 	})
 }
 
+func TestDeletingOuterModuleKeepsInnerModuleOutOfScope(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "outer/go.mod", "module example.com/outer\n\ngo 1.23\n")
+	writeTestFile(t, repo, "outer/inner/go.mod", "module example.com/inner\n\ngo 1.23\n")
+	writeTestFile(t, repo, "outer/inner/nested.go", "package inner\nfunc Nested() {}\n")
+	commitTestRepository(t, repo, "nested module hierarchy")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if err := os.Remove(filepath.Join(repo, "outer", "go.mod")); err != nil {
+		t.Fatal(err)
+	}
+	commitTestRepository(t, repo, "delete outer boundary")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		if _, err := changedFiles(baseRef, headRef); err != nil {
+			t.Fatalf("inner module remains outside root scope after outer deletion: %v", err)
+		}
+		if _, err := collectChangedFunctions(baseRef, headRef); err != nil {
+			t.Fatalf("outer boundary deletion inventory: %v", err)
+		}
+	})
+}
+
 func assertChangedFilesAcceptEmptyDiff(t *testing.T) {
 	t.Helper()
 	empty, err := parseChangedFiles(" \n")
@@ -442,6 +464,44 @@ func TestMovedFunctionAcrossSameNamedPackagesIsNew(t *testing.T) {
 		err = run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, &output)
 		if err == nil || !strings.Contains(output.String(), "new main/cmd/b/main.go:Legacy") || !strings.Contains(output.String(), "allowed=false") {
 			t.Fatalf("cross-package move policy error=%v output=%s", err, output.String())
+		}
+	})
+}
+
+func TestCrossDirectoryR100RenameDoesNotPreserveLegacy(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "cmd/a/legacy.go", "package main\nfunc Legacy() int { return 1 }\n")
+	commitTestRepository(t, repo, "base function")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if err := os.Remove(filepath.Join(repo, "cmd", "a", "legacy.go")); err != nil {
+		t.Fatal(err)
+	}
+	writeTestFile(t, repo, "cmd/b/legacy.go", "package main\nfunc Legacy() int { return 1 }\n")
+	commitTestRepository(t, repo, "move function across package dirs")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		files, err := changedFiles(baseRef, headRef)
+		if err != nil || len(files) != 1 || files[0].status != "R100" && files[0].status != "R" {
+			t.Fatalf("cross-directory rename detection = %#v, err=%v", files, err)
+		}
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil {
+			t.Fatalf("collect cross-directory rename: %v", err)
+		}
+		newID := functionID{Package: "main", File: "cmd/b/legacy.go", Name: "Legacy"}
+		if _, aliased := changed.renamedBaseIDs[newID]; aliased {
+			t.Fatal("cross-directory rename retained legacy alias")
+		}
+		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+			{File: "cmd/a/legacy.go", Package: "main", Function: "Legacy", CRAP: floatPtr(15), Cyclomatic: intPtr(11), Coverage: floatPtr(100), Line: intPtr(2)},
+		}})
+		headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+			{File: "cmd/b/legacy.go", Package: "main", Function: "Legacy", CRAP: floatPtr(15), Cyclomatic: intPtr(11), Coverage: floatPtr(100), Line: intPtr(2)},
+		}})
+		var output strings.Builder
+		err = run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, &output)
+		if err == nil || !strings.Contains(output.String(), "new main/cmd/b/legacy.go:Legacy") || !strings.Contains(output.String(), "allowed=false") {
+			t.Fatalf("cross-directory rename policy error=%v output=%s", err, output.String())
 		}
 	})
 }

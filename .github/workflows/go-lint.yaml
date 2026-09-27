@@ -57,7 +57,7 @@ jobs:
           if [[ "$base_sha" =~ ^0+$ ]]; then
             echo 'No prior commit available; linting full repository.'
           else
-            lint+=(--new-from-rev="$base_sha")
+            lint+=(--new-from-rev="$base_sha" --whole-files)
           fi
           "${lint[@]}" ./...
 

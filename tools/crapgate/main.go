@@ -283,7 +283,7 @@ func rejectNestedModuleBoundaryChanges(baseRef, headRef string) error {
 		return err
 	}
 	for _, file := range files {
-		changed, err := nestedModuleBoundaryChanged(baseRef, file)
+		changed, err := nestedModuleBoundaryChanged(baseRef, headRef, file)
 		if err != nil {
 			return err
 		}
@@ -294,24 +294,33 @@ func rejectNestedModuleBoundaryChanges(baseRef, headRef string) error {
 	return nil
 }
 
-func nestedModuleBoundaryChanged(baseRef string, file changedFile) (bool, error) {
-	if file.status != "A" && file.status != "D" && file.status != "R" {
+func nestedModuleBoundaryChanged(baseRef, headRef string, file changedFile) (bool, error) {
+	switch file.status {
+	case "A":
+		return moduleBoundaryHasGoSources(baseRef, file.path)
+	case "D":
+		return moduleBoundaryHasGoSources(headRef, file.path)
+	case "R":
+		return renamedModuleBoundaryHasGoSources(baseRef, headRef, file)
+	default:
 		return false, nil
 	}
-	paths := []string{file.path}
-	if file.status == "R" {
-		paths = append(paths, file.oldPath)
+}
+
+func renamedModuleBoundaryHasGoSources(baseRef, headRef string, file changedFile) (bool, error) {
+	oldScope, err := moduleBoundaryHasGoSources(headRef, file.oldPath)
+	if err != nil || oldScope {
+		return oldScope, err
 	}
-	for _, path := range paths {
-		if !isNestedModulePath(path) {
-			continue
-		}
-		containsGo, err := moduleContainsGoFile(baseRef, filepath.ToSlash(filepath.Dir(path)))
-		if err != nil || containsGo {
-			return containsGo, err
-		}
+	return moduleBoundaryHasGoSources(baseRef, file.path)
+}
+
+func moduleBoundaryHasGoSources(ref, modulePath string) (bool, error) {
+	if !isNestedModulePath(modulePath) {
+		return false, nil
 	}
-	return false, nil
+	directory := filepath.ToSlash(filepath.Dir(modulePath))
+	return moduleContainsGoFile(ref, directory)
 }
 
 func moduleContainsGoFile(ref, directory string) (bool, error) {

@@ -322,6 +322,29 @@ func TestNestedModuleBoundaryChangesFailClosed(t *testing.T) {
 	}
 }
 
+func TestDeletingNestedModuleAndAllGoSourcesIsIgnored(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/go.mod", "module example.com/nested\n\ngo 1.23\n")
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() {}\n")
+	commitTestRepository(t, repo, "nested module")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	for _, path := range []string{"pkg/go.mod", "pkg/service.go"} {
+		if err := os.Remove(filepath.Join(repo, filepath.FromSlash(path))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	commitTestRepository(t, repo, "delete nested module and sources")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		if _, err := changedFiles(baseRef, headRef); err != nil {
+			t.Fatalf("fully deleted nested module should not change source scope: %v", err)
+		}
+		if _, err := collectChangedFunctions(baseRef, headRef); err != nil {
+			t.Fatalf("fully deleted nested module inventory: %v", err)
+		}
+	})
+}
+
 func assertChangedFilesAcceptEmptyDiff(t *testing.T) {
 	t.Helper()
 	empty, err := parseChangedFiles(" \n")

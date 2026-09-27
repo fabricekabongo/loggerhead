@@ -30,7 +30,7 @@ If you’re building anything that keeps track of “things on a map” and need
 **Fast in-memory engine**
 
 * Geospatial data is kept in memory and indexed with a **quadtree**.
-* Benchmarks (on an AMD EPYC 7763) show:
+* Historical benchmark figures (AMD EPYC 7763; uncontrolled legacy workloads) reported:
 
   * ~20–25M `GetLocation` lookups per second.
   * ~500k `Save` operations per second.
@@ -222,7 +222,7 @@ DELETE mynamespace myid
 
 ## Performance
 
-The in-memory engine has been benchmarked on an **AMD EPYC 7763 64-core processor** using Go 1.22.1.
+The figures below are **historical, uncontrolled results** from the legacy benchmark suite on an **AMD EPYC 7763 64-core processor** using Go 1.22.1. They are not a current comparable baseline. The current isolated Save benchmark smoke command is `go test ./world -run '^$' -bench '^BenchmarkWorldSave$' -benchmem -benchtime=1000x -cpu=1`; it reports results for both new inserts and fixed-population local updates.
 
 Headline numbers (for 1–4 cores):
 
@@ -239,11 +239,11 @@ Deletes are currently protected by a **global/index-level lock**. Under syntheti
 
 ## Benchmark of the Core World Engine
 
-These benchmarks test the **core in-memory engine** only. They do **not** include network or protocol overhead, to keep the numbers comparable across environments.
+The historical results below measured the **core in-memory engine** only; they exclude network and protocol work. Their workloads were not controlled for comparison across runs or environments.
 
 * Benchmark duration: **2 seconds** per run.
 * Cores tested: **1, 2, 4, 8, 16, 32** (only 1 / 2 / 4 shown here).
-* Expect a slight decrease in end-to-end performance when using a real network.
+* No matched network measurement accompanies these results.
 
 ### Engine running on 1 core
 

@@ -1,0 +1,16 @@
+goos: windows
+goarch: amd64
+pkg: github.com/fabricekabongo/loggerhead/world
+cpu: AMD Ryzen 7 4800H with Radeon Graphics
+BenchmarkWorldSave/NewInsert/Sequential         	   10000	       632.9 ns/op	     10000 entities	      2401 seed	     249 B/op	       1 allocs/op
+BenchmarkWorldSave/NewInsert/Sequential         	   10000	       571.3 ns/op	     10000 entities	      2401 seed	     249 B/op	       1 allocs/op
+BenchmarkWorldSave/NewInsert/Sequential         	   10000	       706.9 ns/op	     10000 entities	      2401 seed	     249 B/op	       1 allocs/op
+BenchmarkWorldSave/NewInsert/Sequential         	   10000	       741.1 ns/op	     10000 entities	      2401 seed	     249 B/op	       1 allocs/op
+BenchmarkWorldSave/NewInsert/Sequential         	   10000	       672.1 ns/op	     10000 entities	      2401 seed	     249 B/op	       1 allocs/op
+BenchmarkWorldSave/FixedPopulationLocalUpdate/Sequential         	   10000	       261.4 ns/op	       256.0 entities	      2402 seed	       0 B/op	       0 allocs/op
+BenchmarkWorldSave/FixedPopulationLocalUpdate/Sequential         	   10000	       261.5 ns/op	       256.0 entities	      2402 seed	       0 B/op	       0 allocs/op
+BenchmarkWorldSave/FixedPopulationLocalUpdate/Sequential         	   10000	       261.6 ns/op	       256.0 entities	      2402 seed	       0 B/op	       0 allocs/op
+BenchmarkWorldSave/FixedPopulationLocalUpdate/Sequential         	   10000	       259.7 ns/op	       256.0 entities	      2402 seed	       0 B/op	       0 allocs/op
+BenchmarkWorldSave/FixedPopulationLocalUpdate/Sequential         	   10000	       333.8 ns/op	       256.0 entities	      2402 seed	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/fabricekabongo/loggerhead/world	1.226s

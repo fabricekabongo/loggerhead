@@ -31,4 +31,5 @@ jobs:
           tar -xzf "$RUNNER_TEMP/go-arch-lint.tar.gz" -C "$RUNNER_TEMP/go-arch-lint"
       - name: Enforce package dependencies
         shell: bash
-        run: "$RUNNER_TEMP/go-arch-lint/go-arch-lint" check --project-path . --arch-file .go-arch-lint.yml
+        run: |
+          "$RUNNER_TEMP/go-arch-lint/go-arch-lint" check --project-path . --arch-file .go-arch-lint.yml

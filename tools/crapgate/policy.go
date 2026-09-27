@@ -200,9 +200,9 @@ func parseFunctions(filename, packageName string, source []byte) (map[functionID
 		var receiver string
 		if fn.Recv != nil && len(fn.Recv.List) > 0 {
 			receiver, err = formatNode(fset, fn.Recv.List[0].Type)
+			// Parser-produced receiver nodes are valid for go/format.
+			// skipcq: TCV-001
 			if err != nil {
-				// Parser-produced receiver nodes are valid for go/format.
-				// skipcq: TCV-001
 				return nil, fmt.Errorf("format receiver in %s: %w", filename, err)
 			}
 		}

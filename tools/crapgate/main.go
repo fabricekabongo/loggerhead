@@ -29,9 +29,9 @@ type changedFile struct {
 
 func main() {
 	log.SetFlags(0)
+	// Process termination cannot be reached by the in-process Go test harness.
+	// skipcq: TCV-001
 	if err := execute(os.Args[1:]); err != nil {
-		// Process termination cannot be reached by the in-process Go test harness.
-		// skipcq: TCV-001
 		log.Fatal(err)
 	}
 }

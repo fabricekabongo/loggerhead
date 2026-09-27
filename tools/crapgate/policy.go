@@ -205,14 +205,16 @@ func parseFunctions(filename, packageName string, source []byte) (map[functionID
 			continue
 		}
 		receiver, err := formatReceiver(fset, filename, fn)
+		// Parser-produced receiver nodes are valid for go/format.
+		// skipcq: TCV-001
 		if err != nil {
 			return nil, err
 		}
 		id := functionID{Package: packageName, File: normalizeReportedPath(filename), Receiver: receiver, Name: fn.Name.Name}
 		text, err := formatNode(fset, fn)
+		// Parser-produced declarations are valid for go/format.
+		// skipcq: TCV-001
 		if err != nil {
-			// Parser-produced declarations are valid for go/format.
-			// skipcq: TCV-001
 			return nil, fmt.Errorf("format %s in %s: %w", fn.Name.Name, filename, err)
 		}
 		functions[id] = text

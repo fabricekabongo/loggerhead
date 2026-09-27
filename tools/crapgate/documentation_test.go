@@ -19,4 +19,7 @@ func TestParseFunctionsSkipsDocumentationPackageBeforeBodyParsing(t *testing.T) 
 	if _, err := parseFunctions("pkg/production.go", "", []byte("package production\nfunc Malformed( {\n")); err == nil {
 		t.Fatal("malformed production package was ignored")
 	}
+	if _, err := parseFunctions("pkg/production.go", "", []byte("package\n")); err == nil {
+		t.Fatal("malformed package clause was ignored")
+	}
 }

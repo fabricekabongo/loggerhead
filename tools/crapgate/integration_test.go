@@ -2,6 +2,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"log"
@@ -90,6 +91,7 @@ func TestRunComparesChangesInTemporaryGitRepository(t *testing.T) {
 	baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 1)}})
 	headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
 		reportEntry("pkg/service.go", "Stable", 1), reportEntry("pkg/new.go", "Added", 1),
+		{File: "pkg/vendor/dep.go", Package: "dep", Function: "Vendored", CRAP: floatPtr(1), Cyclomatic: intPtr(1), Coverage: floatPtr(100), Line: intPtr(2)},
 	}})
 	withWorkingDirectory(t, repo, func() {
 		args := []string{"--base-report", baseReport, "--head-report", headReport, "--base-ref", baseRef, "--head-ref", headRef}
@@ -308,7 +310,7 @@ func assertModifiedRenameDiff(t *testing.T, baseRef, headRef string) {
 
 func assertModifiedRenameInventory(t *testing.T, baseRef, headRef string) {
 	t.Helper()
-	baseFunctions, headFunctions, aliases, testOnly, err := collectChangedFunctions(baseRef, headRef)
+	baseFunctions, headFunctions, aliases, testOnly, _, err := collectChangedFunctions(baseRef, headRef)
 	if err != nil {
 		t.Fatalf("collect renamed functions: %v", err)
 	}
@@ -385,7 +387,7 @@ func assertDeletedTestDiff(t *testing.T, baseRef, headRef string) {
 
 func assertDeletedTestInventory(t *testing.T, baseRef, headRef string) {
 	t.Helper()
-	baseFunctions, headFunctions, _, testOnly, err := collectChangedFunctions(baseRef, headRef)
+	baseFunctions, headFunctions, _, testOnly, _, err := collectChangedFunctions(baseRef, headRef)
 	if err != nil {
 		t.Fatalf("collect deleted-test functions: %v", err)
 	}
@@ -425,6 +427,65 @@ func TestDeletedProductionFileFailsClosed(t *testing.T) {
 	})
 }
 
+func TestMixedProductionAndTestChangesCheckUnaffectedCRAP(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Changed() int { return 1 }\nfunc Legacy() int { return 7 }\n")
+	commitTestRepository(t, repo, "base source")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Changed() int { return 2 }\nfunc Legacy() int { return 7 }\n")
+	writeTestFile(t, repo, "pkg/service_test.go", "package sample\nfunc TestChanged() {}\n")
+	commitTestRepository(t, repo, "production and test change")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		_, _, _, testOnly, testsChanged, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil || testOnly || !testsChanged {
+			t.Fatalf("mixed diff classification: testOnly=%t testsChanged=%t err=%v", testOnly, testsChanged, err)
+		}
+		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+			reportEntry("pkg/service.go", "Changed", 2), reportEntry("pkg/service.go", "Legacy", 11),
+		}})
+		headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+			reportEntry("pkg/service.go", "Changed", 2), reportEntry("pkg/service.go", "Legacy", 12),
+		}})
+		var output bytes.Buffer
+		err = run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, &output)
+		if err == nil || !strings.Contains(err.Error(), "CRAP policy failed") {
+			t.Fatalf("worsened untouched legacy function passed mixed diff: %v", err)
+		}
+		if strings.Count(output.String(), "\nchanged sample/pkg/service.go:Changed ") != 1 ||
+			strings.Count(output.String(), "\ncoverage sample/pkg/service.go:Legacy ") != 1 ||
+			strings.Contains(output.String(), "\ncoverage sample/pkg/service.go:Changed ") {
+			t.Fatalf("mixed diff results duplicated or omitted function: %s", output.String())
+		}
+	})
+}
+
+func TestDeletedBuildExcludedFileDoesNotFailClosed(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/tooling.go", "//go:build tools\n\npackage sample\nfunc ToolOnly() {}\n")
+	commitTestRepository(t, repo, "base source")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if err := os.Remove(filepath.Join(repo, "pkg", "tooling.go")); err != nil {
+		t.Fatal(err)
+	}
+	commitTestRepository(t, repo, "delete excluded source")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		if _, _, _, _, _, err := collectChangedFunctions(baseRef, headRef); err != nil {
+			t.Fatalf("deleted build-excluded file should be ignored: %v", err)
+		}
+	})
+}
+
+func TestVendorScopeMatchesGoWildcardBehavior(t *testing.T) {
+	if !isProductionGoPath("pkg/vendor/standalone.go") {
+		t.Fatal("direct package file under vendor should be included")
+	}
+	if isProductionGoPath("pkg/vendor/third_party/dep.go") {
+		t.Fatal("descendant under vendor should be excluded")
+	}
+}
+
 func TestRenameFromProductionIntoExcludedPathFailsClosed(t *testing.T) {
 	repo := initTestRepository(t)
 	writeTestFile(t, repo, "pkg/source.go", "package sample\nfunc Stable() int { return 1 }\n")
@@ -442,8 +503,65 @@ func TestRenameFromProductionIntoExcludedPathFailsClosed(t *testing.T) {
 		if err != nil || len(files) != 1 || files[0].status != "R" {
 			t.Fatalf("source move was not detected as rename: %#v, err=%v", files, err)
 		}
-		if _, _, _, _, err := collectChangedFunctions(baseRef, headRef); err == nil || !strings.Contains(err.Error(), "excluded path") {
+		if _, _, _, _, _, err := collectChangedFunctions(baseRef, headRef); err == nil || !strings.Contains(err.Error(), "excluded path") {
 			t.Fatalf("rename into excluded path error = %v", err)
+		}
+	})
+}
+
+func TestRenameBuildScopeUsesLinuxDefaultFiles(t *testing.T) {
+	for _, tc := range []struct {
+		name, oldPath, newPath   string
+		wantBase, wantHead       int
+		wantError                bool
+		oldExcluded, newExcluded bool
+	}{
+		{name: "default to windows", oldPath: "pkg/source.go", newPath: "pkg/source_windows.go", wantBase: 1, wantError: true},
+		{name: "windows to default", oldPath: "pkg/source_windows.go", newPath: "pkg/source.go", wantHead: 1},
+		{name: "default to tagged out", oldPath: "pkg/source.go", newPath: "pkg/source_tools.go", wantBase: 1, wantError: true, newExcluded: true},
+		{name: "tagged out to default", oldPath: "pkg/source_tools.go", newPath: "pkg/source.go", wantHead: 1, oldExcluded: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			assertRenameBuildScope(t, tc)
+		})
+	}
+}
+
+func assertRenameBuildScope(t *testing.T, tc struct {
+	name, oldPath, newPath   string
+	wantBase, wantHead       int
+	wantError                bool
+	oldExcluded, newExcluded bool
+}) {
+	t.Helper()
+	repo := initTestRepository(t)
+	defaultSource := "package sample\nfunc Stable() {}\n"
+	oldSource := defaultSource
+	newSource := defaultSource
+	if tc.oldExcluded {
+		oldSource = "//go:build tools\n\n" + defaultSource
+	}
+	if tc.newExcluded {
+		newSource = "//go:build tools\n\n" + defaultSource
+	}
+	writeTestFile(t, repo, tc.oldPath, oldSource)
+	commitTestRepository(t, repo, "base source")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if tc.oldPath != tc.newPath {
+		if err := os.Remove(filepath.Join(repo, filepath.FromSlash(tc.oldPath))); err != nil {
+			t.Fatal(err)
+		}
+	}
+	writeTestFile(t, repo, tc.newPath, newSource)
+	commitTestRepository(t, repo, "renamed source")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		base, head, _, _, _, err := collectChangedFunctions(baseRef, headRef)
+		if (err != nil) != tc.wantError {
+			t.Fatalf("collect rename error = %v, wantError %t", err, tc.wantError)
+		}
+		if err == nil && (len(base) != tc.wantBase || len(head) != tc.wantHead) {
+			t.Fatalf("rename inventory = base %d head %d, want %d and %d", len(base), len(head), tc.wantBase, tc.wantHead)
 		}
 	})
 }
@@ -504,7 +622,7 @@ func TestGoldenFixtureIsOutsideProductionScope(t *testing.T) {
 	commitTestRepository(t, repo, "fixture only")
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
-		base, head, _, testOnly, err := collectChangedFunctions(baseRef, headRef)
+		base, head, _, testOnly, _, err := collectChangedFunctions(baseRef, headRef)
 		if err != nil || !testOnly || len(base) != 0 || len(head) != 0 {
 			t.Fatalf("fixture-only diff classification = base %v head %v testOnly %t err %v", base, head, testOnly, err)
 		}

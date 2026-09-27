@@ -69,7 +69,7 @@ func run(config options, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	baseFunctions, headFunctions, renamedBaseIDs, testOnly, err := collectChangedFunctions(config.baseRef, config.headRef)
+	baseFunctions, headFunctions, renamedBaseIDs, testOnly, testsChanged, err := collectChangedFunctions(config.baseRef, config.headRef)
 	if err != nil {
 		return err
 	}
@@ -78,6 +78,11 @@ func run(config options, output io.Writer) error {
 		results, err = evaluateTestOnlyCRAPChanges(base, head)
 	} else {
 		results, err = evaluateWithRenamedBaseIDs(base, head, baseFunctions, headFunctions, renamedBaseIDs)
+		if err == nil && testsChanged {
+			var testResults []result
+			testResults, err = evaluateUnaffectedCRAPChanges(base, head, baseFunctions, headFunctions, renamedBaseIDs)
+			results = append(results, testResults...)
+		}
 	}
 	if err != nil {
 		return err
@@ -147,24 +152,28 @@ func readReport(path, label string) (map[functionID]entry, error) {
 	return entries, nil
 }
 
-func collectChangedFunctions(baseRef, headRef string) (map[functionID]string, map[functionID]string, map[functionID]functionID, bool, error) {
+func collectChangedFunctions(baseRef, headRef string) (map[functionID]string, map[functionID]string, map[functionID]functionID, bool, bool, error) {
 	files, err := changedFiles(baseRef, headRef)
 	if err != nil {
-		return nil, nil, nil, false, err
+		return nil, nil, nil, false, false, err
 	}
 	baseFunctions := make(map[functionID]string)
 	headFunctions := make(map[functionID]string)
 	renamedBaseIDs := make(map[functionID]functionID)
 	testOnly := len(files) > 0
+	testsChanged := false
 	for _, file := range files {
 		if !isTestOnlyChange(file) {
 			testOnly = false
 		}
+		if strings.HasSuffix(file.path, "_test.go") {
+			testsChanged = true
+		}
 		if err := collectOneFile(file, baseRef, headRef, baseFunctions, headFunctions, renamedBaseIDs); err != nil {
-			return nil, nil, nil, false, err
+			return nil, nil, nil, false, false, err
 		}
 	}
-	return baseFunctions, headFunctions, renamedBaseIDs, testOnly, nil
+	return baseFunctions, headFunctions, renamedBaseIDs, testOnly, testsChanged, nil
 }
 
 func isTestOnlyChange(file changedFile) bool {
@@ -258,26 +267,47 @@ func collectDeletedFile(file changedFile, baseRef string) error {
 	if err != nil || !included {
 		return err
 	}
+	inBuild, err := deletedFileInBuild(baseRef, file.path)
+	if err != nil || !inBuild {
+		return err
+	}
 	return fmt.Errorf("deleted production Go file %s cannot be assessed against a head CRAP report", file.path)
+}
+
+func deletedFileInBuild(ref, path string) (bool, error) {
+	return sourceInLinuxDefaultBuild(ref, path, "deleted source")
 }
 
 func collectModifiedFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string) error {
 	if !isProductionGoPath(file.path) {
 		return nil
 	}
+	baseIncluded := false
 	if file.status != "A" {
-		if _, err := collectProductionFile(baseFunctions, baseRef, file.path); err != nil {
+		included, err := collectProductionFile(baseFunctions, baseRef, file.path)
+		if err != nil {
 			return err
 		}
+		baseIncluded = included
 	}
-	_, err := collectProductionFile(headFunctions, headRef, file.path)
-	return err
+	headIncluded, err := collectProductionFile(headFunctions, headRef, file.path)
+	if err != nil {
+		return err
+	}
+	if baseIncluded && !headIncluded {
+		return fmt.Errorf("production Go file %s left the default build and cannot be assessed", file.path)
+	}
+	return nil
 }
 
 func collectProductionFile(functions map[functionID]string, ref, path string) (bool, error) {
 	included, err := pathInScannedModule(ref, path)
 	if err != nil || !included {
 		return included, err
+	}
+	inBuild, err := sourceInLinuxDefaultBuild(ref, path, "source")
+	if err != nil || !inBuild {
+		return false, err
 	}
 	return true, addFileFunctions(functions, ref, path)
 }
@@ -287,7 +317,23 @@ func collectRenamedSource(functions map[functionID]string, ref, sourcePath, iden
 	if err != nil || !included {
 		return included, err
 	}
+	inBuild, err := sourceInLinuxDefaultBuild(ref, sourcePath, "source")
+	if err != nil || !inBuild {
+		return false, err
+	}
 	return true, addFileFunctionsAt(functions, ref, sourcePath, identityPath, aliases)
+}
+
+func sourceInLinuxDefaultBuild(ref, path, label string) (bool, error) {
+	source, err := gitOutput("show", ref+":"+path)
+	if err != nil {
+		return false, fmt.Errorf("read %s %s:%s: %w", label, ref, path, err)
+	}
+	inBuild, err := fileInLinuxDefaultBuild(path, []byte(source))
+	if err != nil {
+		return false, fmt.Errorf("check build constraints for %s %s at %s: %w", label, path, ref, err)
+	}
+	return inBuild, nil
 }
 
 func isProductionGoPath(path string) bool {
@@ -296,8 +342,9 @@ func isProductionGoPath(path string) bool {
 
 func pathExcludedByGoPattern(path string) bool {
 	parts := strings.Split(filepath.ToSlash(path), "/")
-	for _, part := range parts[:len(parts)-1] {
-		if part == "vendor" || part == "testdata" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
+	for index, part := range parts[:len(parts)-1] {
+		vendorDescendant := part == "vendor" && len(parts)-index > 2
+		if vendorDescendant || part == "testdata" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
 			return true
 		}
 	}

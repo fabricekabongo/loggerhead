@@ -265,6 +265,34 @@ func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, 
 	return results, nil
 }
 
+func evaluateUnaffectedCRAPChanges(base, head map[functionID]entry, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) ([]result, error) {
+	var results []result
+	for id, headEntry := range head {
+		baseEntry, exists := base[id]
+		if !exists || productionFunctionChanged(id, baseFunctions, headFunctions, renamedBaseIDs) {
+			continue
+		}
+		item, changed := testOnlyCRAPResult(id, baseEntry, headEntry)
+		if changed {
+			results = append(results, item)
+		}
+	}
+	sort.Slice(results, func(i, j int) bool { return results[i].ID.String() < results[j].ID.String() })
+	return results, nil
+}
+
+func productionFunctionChanged(id functionID, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) bool {
+	if _, renamed := renamedBaseIDs[id]; renamed {
+		return true
+	}
+	headBody, changedFile := headFunctions[id]
+	if !changedFile {
+		return false
+	}
+	baseBody, existed := baseFunctions[id]
+	return !existed || baseBody != headBody
+}
+
 func improvesOrMeetsLimit(base, head, limit float64) bool {
 	if base <= limit {
 		return head <= limit

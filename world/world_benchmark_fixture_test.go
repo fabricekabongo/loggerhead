@@ -163,6 +163,32 @@ func TestSequentialInsertBenchmarkCountLimit(t *testing.T) {
 	}
 }
 
+func TestBenchmarkSpatialMembershipDetectsWrongLeaf(t *testing.T) {
+	point := benchmarkPoint{namespace: "benchmark", id: "location-0", lat: 12, lon: 25}
+	fixture, err := newBenchmarkFixture([]benchmarkPoint{point})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := checkBenchmarkSpatialMembership(fixture.world, []benchmarkPoint{point}); err != nil {
+		t.Fatalf("correct fixture failed spatial check: %v", err)
+	}
+
+	location := fixture.world.namespaces[point.namespace].locations[point.id]
+	location.Node.Delete(point.id)
+	wrongLeaf := fixture.world.namespaces[point.namespace].tree.Root.NW
+	for wrongLeaf.IsDivided {
+		wrongLeaf = wrongLeaf.NW
+	}
+	wrongLeaf.Objects[point.id] = location
+	location.Node = wrongLeaf
+	if got := len(fixture.world.QueryRange(point.namespace, -90, 90, -180, 180)); got != 1 {
+		t.Fatalf("corrupt fixture full-world count = %d, want 1", got)
+	}
+	if err := checkBenchmarkSpatialMembership(fixture.world, []benchmarkPoint{point}); err == nil {
+		t.Fatal("spatial check accepted a location stored in the wrong leaf")
+	}
+}
+
 func BenchmarkWorldSave(b *testing.B) {
 	b.Run("NewInsert/Sequential", func(b *testing.B) {
 		const seed = 2401
@@ -230,4 +256,18 @@ func verifyBenchmarkWorld(b *testing.B, world *World, expected []benchmarkPoint)
 	if got := len(world.QueryRange("benchmark", -90, 90, -180, 180)); got != len(expected) {
 		b.Fatalf("benchmark population = %d, want %d", got, len(expected))
 	}
+	if err := checkBenchmarkSpatialMembership(world, expected); err != nil {
+		b.Fatal(err)
+	}
+}
+
+func checkBenchmarkSpatialMembership(world *World, expected []benchmarkPoint) error {
+	const margin = 0.0000001
+	for _, point := range expected {
+		matches := world.QueryRange(point.namespace, point.lat-margin, point.lat+margin, point.lon-margin, point.lon+margin)
+		if len(matches) != 1 || matches[0].Id() != point.id || matches[0].Ns() != point.namespace || matches[0].Lat() != point.lat || matches[0].Lon() != point.lon {
+			return fmt.Errorf("spatial index mismatch for (%q, %q) near (%v, %v): got %d matches", point.namespace, point.id, point.lat, point.lon, len(matches))
+		}
+	}
+	return nil
 }

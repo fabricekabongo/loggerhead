@@ -204,14 +204,9 @@ func parseFunctions(filename, packageName string, source []byte) (map[functionID
 		if !ok {
 			continue
 		}
-		var receiver string
-		if fn.Recv != nil && len(fn.Recv.List) > 0 {
-			receiver, err = formatNode(fset, fn.Recv.List[0].Type)
-			// Parser-produced receiver nodes are valid for go/format.
-			// skipcq: TCV-001
-			if err != nil {
-				return nil, fmt.Errorf("format receiver in %s: %w", filename, err)
-			}
+		receiver, err := formatReceiver(fset, filename, fn)
+		if err != nil {
+			return nil, err
 		}
 		id := functionID{Package: packageName, File: normalizeReportedPath(filename), Receiver: receiver, Name: fn.Name.Name}
 		text, err := formatNode(fset, fn)
@@ -223,6 +218,19 @@ func parseFunctions(filename, packageName string, source []byte) (map[functionID
 		functions[id] = text
 	}
 	return functions, nil
+}
+
+func formatReceiver(fset *token.FileSet, filename string, fn *ast.FuncDecl) (string, error) {
+	if fn.Recv == nil || len(fn.Recv.List) == 0 {
+		return "", nil
+	}
+	receiver, err := formatNode(fset, fn.Recv.List[0].Type)
+	if err != nil {
+		// Parser-produced receiver nodes are valid for go/format.
+		// skipcq: TCV-001
+		return "", fmt.Errorf("format receiver in %s: %w", filename, err)
+	}
+	return receiver, nil
 }
 
 func formatNode(fset *token.FileSet, node ast.Node) (string, error) {
@@ -244,14 +252,7 @@ func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, 
 		if !found {
 			return nil, fmt.Errorf("head CRAP report missing function %s", id)
 		}
-		baseID := id
-		if renamedID, renamed := renamedBaseIDs[id]; renamed {
-			baseID = renamedID
-		}
-		baseBody, existed := baseFunctions[id]
-		if !existed && baseID != id {
-			baseBody, existed = baseFunctions[baseID]
-		}
+		baseID, baseBody, existed := baseFunctionSource(id, baseFunctions, renamedBaseIDs)
 		if !existed {
 			allowed := *headEntry.CRAP <= maxCRAP && *headEntry.Cyclomatic <= maxCyclomatic
 			reason := "new function must have CRAP <= 10 and cyclomatic complexity <= 10"
@@ -275,13 +276,22 @@ func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, 
 	return results, nil
 }
 
+func baseFunctionSource(id functionID, functions map[functionID]string, aliases map[functionID]functionID) (functionID, string, bool) {
+	baseID, aliased := aliases[id]
+	if !aliased {
+		baseID = id
+	}
+	body, exists := functions[id]
+	if !exists && baseID != id {
+		body, exists = functions[baseID]
+	}
+	return baseID, body, exists
+}
+
 func evaluateUnaffectedCRAPChanges(base, head map[functionID]entry, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) ([]result, error) {
 	var results []result
 	for id, headEntry := range head {
-		baseID := id
-		if renamedID, renamed := renamedBaseIDs[id]; renamed {
-			baseID = renamedID
-		}
+		baseID, _, _ := baseFunctionSource(id, baseFunctions, renamedBaseIDs)
 		baseEntry, exists := base[baseID]
 		if !exists || productionFunctionChanged(id, baseFunctions, headFunctions, renamedBaseIDs) {
 			continue
@@ -300,12 +310,7 @@ func productionFunctionChanged(id functionID, baseFunctions, headFunctions map[f
 	if !changedFile {
 		return false
 	}
-	baseBody, existed := baseFunctions[id]
-	if !existed {
-		if baseID, renamed := renamedBaseIDs[id]; renamed {
-			baseBody, existed = baseFunctions[baseID]
-		}
-	}
+	_, baseBody, existed := baseFunctionSource(id, baseFunctions, renamedBaseIDs)
 	return !existed || baseBody != headBody
 }
 

@@ -255,96 +255,100 @@ func TestBenchmarkSpatialMembershipDetectsWrongLeaf(t *testing.T) {
 }
 
 func BenchmarkWorldSave(b *testing.B) {
-	b.Run("NewInsert/Parallel", func(b *testing.B) {
-		const seed = 2403
-		if err := validateParallelInsertCount(b.N); err != nil {
-			b.Fatal(err)
-		}
-		points := benchmarkPoints(seed, b.N)
-		world := NewWorld()
-		var allocator benchmarkInsertAllocator
-		var callbackWorkers atomic.Uint64
-		var firstError error
-		var errorOnce sync.Once
+	b.Run("NewInsert/Parallel", benchmarkWorldSaveParallelInsert)
+	b.Run("NewInsert/Sequential", benchmarkWorldSaveSequentialInsert)
+	b.Run("FixedPopulationLocalUpdate/Sequential", benchmarkWorldSaveLocalUpdate)
+}
 
-		b.ReportAllocs()
-		b.ResetTimer()
-		b.RunParallel(func(pb *testing.PB) {
-			callbackWorkers.Add(1)
-			for pb.Next() {
-				index := allocator.nextIndex()
-				point := points[index]
-				if err := world.Save(point.namespace, point.id, point.lat, point.lon); err != nil {
-					errorOnce.Do(func() {
-						firstError = fmt.Errorf("insert (%q, %q): %w", point.namespace, point.id, err)
-					})
-				}
-			}
-		})
-		b.StopTimer()
+func benchmarkWorldSaveParallelInsert(b *testing.B) {
+	const seed = 2403
+	if err := validateParallelInsertCount(b.N); err != nil {
+		b.Fatal(err)
+	}
+	points := benchmarkPoints(seed, b.N)
+	world := NewWorld()
+	var allocator benchmarkInsertAllocator
+	var callbackWorkers atomic.Uint64
+	var firstError error
+	var errorOnce sync.Once
 
-		if firstError != nil {
-			b.Fatal(firstError)
-		}
-		if got := allocator.next.Load(); got != uint64(b.N) {
-			b.Fatalf("allocated operations = %d, want %d", got, b.N)
-		}
-		verifyBenchmarkWorld(b, world, points)
-		b.ReportMetric(float64(seed), "seed")
-		b.ReportMetric(float64(len(points)), "entities")
-		b.ReportMetric(float64(callbackWorkers.Load()), "callback-workers")
-	})
-
-	b.Run("NewInsert/Sequential", func(b *testing.B) {
-		const seed = 2401
-		if err := validateSequentialInsertCount(b.N); err != nil {
-			b.Fatal(err)
-		}
-		points := benchmarkPoints(seed, b.N)
-		world := NewWorld()
-		b.ReportAllocs()
-		b.ResetTimer()
-		for _, point := range points {
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.RunParallel(func(pb *testing.PB) {
+		callbackWorkers.Add(1)
+		for pb.Next() {
+			index := allocator.nextIndex()
+			point := points[index]
 			if err := world.Save(point.namespace, point.id, point.lat, point.lon); err != nil {
-				b.Fatalf("insert (%q, %q): %v", point.namespace, point.id, err)
+				errorOnce.Do(func() {
+					firstError = fmt.Errorf("insert (%q, %q): %w", point.namespace, point.id, err)
+				})
 			}
 		}
-		b.StopTimer()
-		verifyBenchmarkWorld(b, world, points)
-		b.ReportMetric(float64(seed), "seed")
-		b.ReportMetric(float64(len(points)), "entities")
 	})
+	b.StopTimer()
 
-	b.Run("FixedPopulationLocalUpdate/Sequential", func(b *testing.B) {
-		const (
-			seed       = 2402
-			population = 256
-		)
-		initial := localBenchmarkPoints(seed, population)
-		fixture, err := newBenchmarkFixture(initial)
-		if err != nil {
-			b.Fatalf("build fixed-population fixture: %v", err)
-		}
-		b.ReportAllocs()
-		b.ResetTimer()
-		for iteration := 0; iteration < b.N; iteration++ {
-			index := iteration % population
-			point := movedBenchmarkPoint(initial[index], iteration/population)
-			if err := fixture.world.Save(point.namespace, point.id, point.lat, point.lon); err != nil {
-				b.Fatalf("update (%q, %q): %v", point.namespace, point.id, err)
-			}
-		}
-		b.StopTimer()
+	if firstError != nil {
+		b.Fatal(firstError)
+	}
+	if got := allocator.next.Load(); got != uint64(b.N) {
+		b.Fatalf("allocated operations = %d, want %d", got, b.N)
+	}
+	verifyBenchmarkWorld(b, world, points)
+	b.ReportMetric(float64(seed), "seed")
+	b.ReportMetric(float64(len(points)), "entities")
+	b.ReportMetric(float64(callbackWorkers.Load()), "callback-workers")
+}
 
-		final := append([]benchmarkPoint(nil), initial...)
-		for index := 0; index < population && index < b.N; index++ {
-			lastIteration := b.N - 1 - (b.N-1-index)%population
-			final[index] = movedBenchmarkPoint(initial[index], lastIteration/population)
+func benchmarkWorldSaveSequentialInsert(b *testing.B) {
+	const seed = 2401
+	if err := validateSequentialInsertCount(b.N); err != nil {
+		b.Fatal(err)
+	}
+	points := benchmarkPoints(seed, b.N)
+	world := NewWorld()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for _, point := range points {
+		if err := world.Save(point.namespace, point.id, point.lat, point.lon); err != nil {
+			b.Fatalf("insert (%q, %q): %v", point.namespace, point.id, err)
 		}
-		verifyBenchmarkWorld(b, fixture.world, final)
-		b.ReportMetric(float64(seed), "seed")
-		b.ReportMetric(float64(population), "entities")
-	})
+	}
+	b.StopTimer()
+	verifyBenchmarkWorld(b, world, points)
+	b.ReportMetric(float64(seed), "seed")
+	b.ReportMetric(float64(len(points)), "entities")
+}
+
+func benchmarkWorldSaveLocalUpdate(b *testing.B) {
+	const (
+		seed       = 2402
+		population = 256
+	)
+	initial := localBenchmarkPoints(seed, population)
+	fixture, err := newBenchmarkFixture(initial)
+	if err != nil {
+		b.Fatalf("build fixed-population fixture: %v", err)
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for iteration := 0; iteration < b.N; iteration++ {
+		index := iteration % population
+		point := movedBenchmarkPoint(initial[index], iteration/population)
+		if err := fixture.world.Save(point.namespace, point.id, point.lat, point.lon); err != nil {
+			b.Fatalf("update (%q, %q): %v", point.namespace, point.id, err)
+		}
+	}
+	b.StopTimer()
+
+	final := append([]benchmarkPoint(nil), initial...)
+	for index := 0; index < population && index < b.N; index++ {
+		lastIteration := b.N - 1 - (b.N-1-index)%population
+		final[index] = movedBenchmarkPoint(initial[index], lastIteration/population)
+	}
+	verifyBenchmarkWorld(b, fixture.world, final)
+	b.ReportMetric(float64(seed), "seed")
+	b.ReportMetric(float64(population), "entities")
 }
 
 func verifyBenchmarkWorld(b *testing.B, world *World, expected []benchmarkPoint) {

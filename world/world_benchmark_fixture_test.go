@@ -1,8 +1,9 @@
 package world
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
-	"math/rand"
 	"strconv"
 	"testing"
 )
@@ -56,31 +57,38 @@ func benchmarkID(index int) string {
 }
 
 func benchmarkPoints(seed int64, count int) []benchmarkPoint {
-	rng := rand.New(rand.NewSource(seed))
 	points := make([]benchmarkPoint, count)
 	for i := range points {
 		points[i] = benchmarkPoint{
 			namespace: "benchmark",
 			id:        benchmarkID(i),
-			lat:       -89 + rng.Float64()*178,
-			lon:       -179 + rng.Float64()*358,
+			lat:       -89 + benchmarkFraction(seed, i, 0)*178,
+			lon:       -179 + benchmarkFraction(seed, i, 1)*358,
 		}
 	}
 	return points
 }
 
 func localBenchmarkPoints(seed int64, count int) []benchmarkPoint {
-	rng := rand.New(rand.NewSource(seed))
 	points := make([]benchmarkPoint, count)
 	for i := range points {
 		points[i] = benchmarkPoint{
 			namespace: "benchmark",
 			id:        benchmarkID(i),
-			lat:       12 + rng.Float64()*0.1,
-			lon:       25 + rng.Float64()*0.1,
+			lat:       12 + benchmarkFraction(seed, i, 0)*0.1,
+			lon:       25 + benchmarkFraction(seed, i, 1)*0.1,
 		}
 	}
 	return points
+}
+
+func benchmarkFraction(seed int64, index int, axis byte) float64 {
+	var input [17]byte
+	binary.BigEndian.PutUint64(input[:8], uint64(seed))
+	binary.BigEndian.PutUint64(input[8:16], uint64(index))
+	input[16] = axis
+	digest := sha256.Sum256(input[:])
+	return float64(binary.BigEndian.Uint64(digest[:8])>>11) / (1 << 53)
 }
 
 func movedBenchmarkPoint(point benchmarkPoint, updateRound int) benchmarkPoint {

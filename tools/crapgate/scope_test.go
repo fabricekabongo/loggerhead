@@ -69,3 +69,22 @@ func TestRenamedModuleBoundaryChecksDestinationSources(t *testing.T) {
 		}
 	})
 }
+
+func TestRemovingGoldenFixtureModuleBoundaryFailsClosed(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "quality/go-crap-fixtures/go.mod", "module example.com/fixture\n\ngo 1.23\n")
+	writeTestFile(t, repo, "quality/go-crap-fixtures/fixture.go", "package fixture\nfunc Golden() {}\n")
+	commitTestRepository(t, repo, "nested fixture")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	if err := os.Remove(filepath.Join(repo, "quality", "go-crap-fixtures", "go.mod")); err != nil {
+		t.Fatal(err)
+	}
+	commitTestRepository(t, repo, "remove fixture boundary")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		_, err := changedFiles(baseRef, headRef)
+		if err == nil || !strings.Contains(err.Error(), "nested module boundary changed") {
+			t.Fatalf("fixture boundary removal error = %v", err)
+		}
+	})
+}

@@ -288,7 +288,7 @@ func moduleChangePath(file changedFile) string {
 }
 
 func isNestedModulePath(path string) bool {
-	return strings.Contains(path, "/") && !strings.HasPrefix(path, "quality/go-crap-fixtures/")
+	return strings.Contains(path, "/")
 }
 
 func collectOneFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) error {

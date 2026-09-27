@@ -1,0 +1,32 @@
+version: 3
+
+workdir: .
+
+allow:
+  depOnAnyVendor: true
+  ignoreNotFoundComponents: false
+
+excludeFiles:
+  - '^.*_test\.go$'
+  - '^.*[\\/]vendor[\\/].*\.go$'
+
+components:
+  main: { in: . }
+  admin: { in: admin }
+  clustering: { in: clustering }
+  config: { in: config }
+  query: { in: query }
+  server: { in: server }
+  world: { in: world }
+
+deps:
+  main:
+    mayDependOn: [admin, clustering, config, query, server, world]
+  admin:
+    mayDependOn: [clustering, config]
+  clustering:
+    mayDependOn: [config, query, world]
+  query:
+    mayDependOn: [world]
+  server:
+    mayDependOn: [query]

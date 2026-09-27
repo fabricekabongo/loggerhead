@@ -367,6 +367,35 @@ func TestDeletingOuterModuleKeepsInnerModuleOutOfScope(t *testing.T) {
 	})
 }
 
+func TestDeletingOuterModuleIgnoresExcludedGoSources(t *testing.T) {
+	for _, tc := range []struct {
+		name, path, source string
+	}{
+		{name: "testdata", path: "outer/testdata/helper.go", source: "package sample\nfunc Hidden() {}\n"},
+		{name: "underscore directory", path: "outer/_generated/helper.go", source: "package sample\nfunc Hidden() {}\n"},
+		{name: "dot directory", path: "outer/.hidden/helper.go", source: "package sample\nfunc Hidden() {}\n"},
+		{name: "build tag", path: "outer/tools.go", source: "//go:build tools\n\npackage sample\nfunc Hidden() {}\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := initTestRepository(t)
+			writeTestFile(t, repo, "outer/go.mod", "module example.com/outer\n\ngo 1.23\n")
+			writeTestFile(t, repo, tc.path, tc.source)
+			commitTestRepository(t, repo, "outer module with excluded source")
+			baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+			if err := os.Remove(filepath.Join(repo, "outer", "go.mod")); err != nil {
+				t.Fatal(err)
+			}
+			commitTestRepository(t, repo, "delete outer boundary")
+			headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+			withWorkingDirectory(t, repo, func() {
+				if _, err := changedFiles(baseRef, headRef); err != nil {
+					t.Fatalf("excluded source incorrectly treated as entering root scope: %v", err)
+				}
+			})
+		})
+	}
+}
+
 func assertChangedFilesAcceptEmptyDiff(t *testing.T) {
 	t.Helper()
 	empty, err := parseChangedFiles(" \n")

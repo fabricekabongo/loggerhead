@@ -331,8 +331,12 @@ func moduleContainsGoFile(ref, directory string) (bool, error) {
 	paths := strings.Split(listing, "\n")
 	nestedModules := nestedModuleDirectories(paths, directory)
 	for _, path := range paths {
-		if strings.HasSuffix(path, ".go") && !isWithinNestedModule(path, nestedModules) {
-			return true, nil
+		if !strings.HasSuffix(path, ".go") || !isProductionGoPath(path) || isWithinNestedModule(path, nestedModules) {
+			continue
+		}
+		included, err := sourceInLinuxDefaultBuild(ref, path, "source inventory")
+		if err != nil || included {
+			return included, err
 		}
 	}
 	return false, nil

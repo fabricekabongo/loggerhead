@@ -5,6 +5,8 @@ import (
 	"flag"
 	"fmt"
 	"go/build"
+	"go/parser"
+	"go/token"
 	"io"
 	"log"
 	"os"
@@ -36,6 +38,7 @@ type changedFunctionSet struct {
 
 type functionSymbol struct {
 	packageName string
+	directory   string
 	receiver    string
 	name        string
 }
@@ -220,7 +223,7 @@ func indexFunctionSymbols(functions map[functionID]string) map[functionSymbol][]
 }
 
 func symbolFor(id functionID) functionSymbol {
-	return functionSymbol{packageName: id.Package, receiver: id.Receiver, name: id.Name}
+	return functionSymbol{packageName: id.Package, directory: filepath.ToSlash(filepath.Dir(id.File)), receiver: id.Receiver, name: id.Name}
 }
 
 func isTestOnlyChange(file changedFile) bool {
@@ -414,7 +417,7 @@ func collectModifiedFile(file changedFile, baseRef, headRef string, baseFunction
 		return err
 	}
 	if baseIncluded && !headIncluded {
-		return fmt.Errorf("production Go file %s left the default build and cannot be assessed", file.path)
+		return fmt.Errorf("production Go file %s left the default build or production package scope and cannot be assessed", file.path)
 	}
 	return nil
 }
@@ -452,7 +455,14 @@ func sourceInLinuxDefaultBuild(ref, path, label string) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("check build constraints for %s %s at %s: %w", label, path, ref, err)
 	}
-	return inBuild, nil
+	if !inBuild {
+		return false, nil
+	}
+	file, err := parser.ParseFile(token.NewFileSet(), path, source, parser.PackageClauseOnly)
+	if err != nil {
+		return false, fmt.Errorf("check package scope for %s %s at %s: %w", label, path, ref, err)
+	}
+	return file.Name.Name != "documentation", nil
 }
 
 func isProductionGoPath(path string) bool {

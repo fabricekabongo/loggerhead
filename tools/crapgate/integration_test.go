@@ -383,6 +383,62 @@ func TestMovedFunctionAliasRejectsAmbiguousSymbol(t *testing.T) {
 	}
 }
 
+func TestMovedFunctionAcrossSameNamedPackagesIsNew(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "cmd/a/main.go", "package main\nfunc Legacy() int { return 1 }\nfunc KeepA() {}\n")
+	writeTestFile(t, repo, "cmd/b/main.go", "package main\nfunc KeepB() {}\n")
+	commitTestRepository(t, repo, "base packages")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	writeTestFile(t, repo, "cmd/a/main.go", "package main\nfunc KeepA() {}\n")
+	writeTestFile(t, repo, "cmd/b/main.go", "package main\nfunc Legacy() int { return 1 }\nfunc KeepB() {}\n")
+	commitTestRepository(t, repo, "move across package directories")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil {
+			t.Fatalf("collect cross-package move: %v", err)
+		}
+		newID := functionID{Package: "main", File: "cmd/b/main.go", Name: "Legacy"}
+		if _, aliased := changed.renamedBaseIDs[newID]; aliased {
+			t.Fatal("function moved between directories with same package name preserved old identity")
+		}
+		mainEntry := func(file, name string, score float64) entry {
+			item := reportEntry(file, name, score)
+			item.Package = "main"
+			return item
+		}
+		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+			{File: "cmd/a/main.go", Package: "main", Function: "Legacy", CRAP: floatPtr(15), Cyclomatic: intPtr(11), Coverage: floatPtr(100), Line: intPtr(2)},
+			mainEntry("cmd/a/main.go", "KeepA", 1), mainEntry("cmd/b/main.go", "KeepB", 1),
+		}})
+		headReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
+			{File: "cmd/b/main.go", Package: "main", Function: "Legacy", CRAP: floatPtr(15), Cyclomatic: intPtr(11), Coverage: floatPtr(100), Line: intPtr(2)},
+			mainEntry("cmd/a/main.go", "KeepA", 1), mainEntry("cmd/b/main.go", "KeepB", 1),
+		}})
+		var output strings.Builder
+		err = run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, &output)
+		if err == nil || !strings.Contains(output.String(), "new main/cmd/b/main.go:Legacy") || !strings.Contains(output.String(), "allowed=false") {
+			t.Fatalf("cross-package move policy error=%v output=%s", err, output.String())
+		}
+	})
+}
+
+func TestProductionFileChangingToDocumentationPackageFailsClosed(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() {}\n")
+	commitTestRepository(t, repo, "base production package")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	writeTestFile(t, repo, "pkg/service.go", "package documentation\nfunc Stable() {}\n")
+	commitTestRepository(t, repo, "change to documentation package")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		_, err := collectChangedFunctions(baseRef, headRef)
+		if err == nil || !strings.Contains(err.Error(), "left the default build or production package scope") {
+			t.Fatalf("documentation package scope change error = %v", err)
+		}
+	})
+}
+
 func assertMovedFunctionPolicy(t *testing.T, tc struct {
 	name        string
 	modifyBody  bool

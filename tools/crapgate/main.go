@@ -1,11 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"go/build"
 	"io"
+	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -23,8 +27,9 @@ type changedFile struct {
 }
 
 func main() {
+	log.SetFlags(0)
 	if err := execute(os.Args[1:]); err != nil {
-		fatalf("%v", err)
+		log.Fatal(err)
 	}
 }
 
@@ -227,6 +232,13 @@ func addFileFunctions(dst map[functionID]string, ref, path string) error {
 	if err != nil {
 		return fmt.Errorf("read %s:%s: %w", ref, path, err)
 	}
+	inBuild, err := fileInLinuxDefaultBuild(path, []byte(source))
+	if err != nil {
+		return fmt.Errorf("check build constraints for %s at %s: %w", path, ref, err)
+	}
+	if !inBuild {
+		return nil
+	}
 	functions, err := parseFunctions(path, "", []byte(source))
 	if err != nil {
 		return fmt.Errorf("parse %s at %s: %w", path, ref, err)
@@ -235,6 +247,17 @@ func addFileFunctions(dst map[functionID]string, ref, path string) error {
 		dst[id] = declaration
 	}
 	return nil
+}
+
+func fileInLinuxDefaultBuild(path string, source []byte) (bool, error) {
+	context := build.Default
+	context.GOOS = "linux"
+	context.GOARCH = "amd64"
+	context.CgoEnabled = true
+	context.OpenFile = func(string) (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(source)), nil
+	}
+	return context.MatchFile(filepath.Dir(path), filepath.Base(path))
 }
 
 func writeResults(output io.Writer, results []result) error {
@@ -267,9 +290,4 @@ func gitOutput(args ...string) (string, error) {
 		return "", fmt.Errorf("git %s: %s: %w", strings.Join(args, " "), strings.TrimSpace(string(output)), err)
 	}
 	return strings.ReplaceAll(string(output), "\r\n", "\n"), nil
-}
-
-func fatalf(format string, args ...any) {
-	fmt.Fprintf(os.Stderr, format+"\n", args...)
-	os.Exit(1)
 }

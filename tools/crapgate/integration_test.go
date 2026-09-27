@@ -23,6 +23,12 @@ func TestParseOptionsHandlesValidMissingAndInvalidFlags(t *testing.T) {
 	if _, err := parseOptions(append(args, "--unknown")); err == nil {
 		t.Fatal("unknown flag accepted")
 	}
+	if _, err := parseOptions([]string{"--base-report"}); err == nil {
+		t.Fatal("flag missing its value accepted")
+	}
+	if _, err := parseOptions([]string{"--base-report", "base.json", "--head-report", "head.json", "--base-ref", "main", "--head-ref"}); err == nil {
+		t.Fatal("final flag missing its value accepted")
+	}
 }
 
 func TestRunComparesChangesInTemporaryGitRepository(t *testing.T) {
@@ -32,6 +38,8 @@ func TestRunComparesChangesInTemporaryGitRepository(t *testing.T) {
 	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() int { return 2 }\n")
 	writeTestFile(t, repo, "pkg/new.go", "package sample\nfunc Added() int { return 3 }\n")
+	writeTestFile(t, repo, "pkg/windows_windows.go", "package sample\nfunc WindowsOnly() int { return 4 }\n")
+	writeTestFile(t, repo, "pkg/tools.go", "//go:build tools\n\npackage sample\nfunc ToolsOnly() int { return 5 }\n")
 	writeTestFile(t, repo, "pkg/service_test.go", "package sample\nfunc TestOnly() {}\n")
 	commitTestRepository(t, repo, "head")
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
@@ -120,12 +128,25 @@ func TestRunAssessesCRAPChangesForTestOnlyDiff(t *testing.T) {
 	})
 }
 
+func TestTestOnlyAssessmentRejectsEqualCountMismatchedInventory(t *testing.T) {
+	baseID := testID("pkg/a.go", "", "A")
+	headID := testID("pkg/b.go", "", "B")
+	base := map[functionID]entry{baseID: reportEntry("pkg/a.go", "A", 5)}
+	head := map[functionID]entry{headID: reportEntry("pkg/b.go", "B", 5)}
+	if _, err := evaluateTestOnlyCRAPChanges(base, head); err == nil {
+		t.Fatal("equal-count but mismatched production inventory accepted")
+	}
+}
+
 func TestGitHelpersCoverEmptyMalformedAndSourceErrors(t *testing.T) {
 	if _, err := gitOutput("not-a-git-command"); err == nil {
 		t.Fatal("git command failure ignored")
 	}
 	if _, err := parseChangedFiles("malformed-line"); err == nil {
 		t.Fatal("malformed name-status line accepted")
+	}
+	if _, err := changedFiles("missing-base-ref", "missing-head-ref"); err == nil {
+		t.Fatal("Git diff failure accepted")
 	}
 	files, err := parseChangedFiles("\nM\tpkg/service.go\nA\tpkg/new.go\n")
 	if err != nil || len(files) != 2 || files[1].status != "A" {
@@ -135,6 +156,9 @@ func TestGitHelpersCoverEmptyMalformedAndSourceErrors(t *testing.T) {
 	if err != nil || len(empty) != 0 {
 		t.Fatalf("empty changed files = %#v, err=%v", empty, err)
 	}
+}
+
+func TestSourceReadAndParseFailuresInGitHistory(t *testing.T) {
 	repo := initTestRepository(t)
 	writeTestFile(t, repo, "pkg/broken.go", "package broken\nfunc Broken( {\n")
 	commitTestRepository(t, repo, "broken syntax")
@@ -144,6 +168,18 @@ func TestGitHelpersCoverEmptyMalformedAndSourceErrors(t *testing.T) {
 		}
 		if _, err := gitOutput("show", "HEAD:missing.go"); err == nil {
 			t.Fatal("missing source accepted")
+		}
+	})
+	baseRepo := initTestRepository(t)
+	writeTestFile(t, baseRepo, "pkg/changed.go", "package broken\nfunc Broken( {\n")
+	commitTestRepository(t, baseRepo, "malformed base")
+	baseRef := gitTestOutput(t, baseRepo, "rev-parse", "HEAD")
+	writeTestFile(t, baseRepo, "pkg/changed.go", "package sample\nfunc Fixed() {}\n")
+	commitTestRepository(t, baseRepo, "valid head")
+	headRef := gitTestOutput(t, baseRepo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, baseRepo, func() {
+		if err := collectOneFile(changedFile{status: "M", path: "pkg/changed.go"}, baseRef, headRef, map[functionID]string{}, map[functionID]string{}); err == nil || !strings.Contains(err.Error(), "parse") {
+			t.Fatalf("malformed base source error = %v", err)
 		}
 	})
 }
@@ -173,6 +209,35 @@ func TestGoldenFixtureIsOutsideProductionScope(t *testing.T) {
 	})
 }
 
+func TestBuildConstraintsMatchLinuxDefaultScope(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		path   string
+		source string
+		want   bool
+	}{
+		{name: "ordinary", path: "pkg/service.go", source: "package sample\nfunc Run() {}\n", want: true},
+		{name: "windows suffix", path: "pkg/service_windows.go", source: "package sample\nfunc Run() {}\n", want: false},
+		{name: "linux suffix", path: "pkg/service_linux.go", source: "package sample\nfunc Run() {}\n", want: true},
+		{name: "tools tag", path: "pkg/service.go", source: "//go:build tools\n\npackage sample\nfunc Run() {}\n", want: false},
+		{name: "linux tag", path: "pkg/service.go", source: "//go:build linux\n\npackage sample\nfunc Run() {}\n", want: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := fileInLinuxDefaultBuild(tc.path, []byte(tc.source))
+			if err != nil || got != tc.want {
+				t.Fatalf("in Linux default build = %t, err=%v, want=%t", got, err, tc.want)
+			}
+		})
+	}
+}
+
+func TestMalformedBuildConstraintsFailClosed(t *testing.T) {
+	_, err := fileInLinuxDefaultBuild("pkg/service.go", []byte("//go:build linux &&\n\npackage sample\nfunc Run() {}\n"))
+	if err == nil {
+		t.Fatal("malformed Go build constraint accepted")
+	}
+}
+
 func TestReportIdentityRejectsMalformedFunctionNames(t *testing.T) {
 	for _, item := range []entry{
 		{File: "pkg/a.go", Package: "sample", Function: "Counter.Run"},
@@ -186,12 +251,54 @@ func TestReportIdentityRejectsMalformedFunctionNames(t *testing.T) {
 	}
 }
 
+func TestReportRejectsTrailingJSONValue(t *testing.T) {
+	data, err := json.Marshal(testReport(reportEntry("pkg/a.go", "Run", 1)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = append(data, []byte(" {}")...)
+	if _, err := parseReport(data); err == nil {
+		t.Fatal("report with trailing JSON value accepted")
+	}
+}
+
+func TestFindEntrySkipsUnrelatedCandidatesBeforePathMatch(t *testing.T) {
+	wantID := testID("repo/pkg/a.go", "", "Run")
+	matchingID := testID("pkg/a.go", "", "Run")
+	unrelatedID := testID("pkg/a.go", "Other", "Run")
+	matching := testEntry(matchingID, "Run", 3)
+	unrelated := testEntry(unrelatedID, "Run", 7)
+	entries := map[functionID]entry{unrelatedID: unrelated, matchingID: matching}
+	got, ok := findEntry(entries, wantID)
+	if !ok || *got.CRAP != 3 {
+		t.Fatalf("path match after unrelated candidate = %#v, %t", got, ok)
+	}
+}
+
 func TestWriteResultsCoversChangedOutput(t *testing.T) {
 	var output strings.Builder
 	err := writeResults(&output, []result{{Kind: "changed", ID: testID("pkg/a.go", "*Thing", "Run"), Base: 11, Head: 10, Delta: -1, BaseCC: 11, HeadCC: 10, CCDelta: -1, Allowed: true}})
 	if err != nil || !strings.Contains(output.String(), "CC base=11 head=10 delta=-1") {
 		t.Fatalf("write result = %q, err=%v", output.String(), err)
 	}
+}
+
+func TestWritersPropagateOutputFailures(t *testing.T) {
+	id := testID("pkg/a.go", "", "Run")
+	item := testEntry(id, "Run", 2)
+	if err := writeWorst(failingWriter{}, map[functionID]entry{id: item}, 1); err == nil {
+		t.Fatal("writeWorst ignored writer failure")
+	}
+	resultItem := result{Kind: "new", ID: id, Head: 2, Allowed: true}
+	if err := writeResults(failingWriter{}, []result{resultItem}); err == nil {
+		t.Fatal("writeResults ignored writer failure")
+	}
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, os.ErrClosed
 }
 
 func TestWorstSummaryRanksFunctionsWithStatementCoverage(t *testing.T) {

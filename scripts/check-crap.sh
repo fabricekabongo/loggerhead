@@ -23,6 +23,10 @@ if [[ $(git -C "$repo_root" rev-parse HEAD) != "$head_sha" ]]; then
   echo "checkout HEAD does not match requested head $head_sha" >&2
   exit 2
 fi
+if [[ $(go env GOOS) != linux || $(go env GOARCH) != amd64 || $(go env CGO_ENABLED) != 1 ]]; then
+  echo 'CRAP comparison requires Linux amd64 with CGO_ENABLED=1 to match the declared build scope' >&2
+  exit 2
+fi
 git -C "$repo_root" cat-file -e "$base_sha^{commit}"
 
 mkdir -p "$output_dir"
@@ -47,6 +51,7 @@ pwsh -NoProfile -File "$repo_root/quality/go-crap-fixtures/verify.ps1" -GoCrap "
 printf 'base_sha=%s\nhead_sha=%s\ngo_crap=v0.5.1\ngo_crap_archive_sha256=%s\ncoverage_mode=atomic\nscope=go_test_./..._default_build_tags\n' \
   "$base_sha" "$head_sha" '5d1dff5bfc5cbc89022efa09aebc79887e3100bbbcb2bddec9b80285e6c5bdfc' > "$output_dir/manifest.txt"
 go version >> "$output_dir/manifest.txt"
+go env GOOS GOARCH CGO_ENABLED >> "$output_dir/manifest.txt"
 
 for side in base head; do
   if [[ $side == base ]]; then

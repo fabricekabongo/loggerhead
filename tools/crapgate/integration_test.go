@@ -259,6 +259,69 @@ func assertChangedFilesParseRenames(t *testing.T) {
 	}
 }
 
+func TestChangedFilesUsesExactDivergentRefs(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/common.go", "package sample\nfunc Common() {}\n")
+	commitTestRepository(t, repo, "common")
+	commonRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	writeTestFile(t, repo, "pkg/base_only.go", "package sample\nfunc BaseOnly() {}\n")
+	commitTestRepository(t, repo, "base branch")
+	baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	runGitTest(t, repo, "checkout", "--quiet", "--detach", commonRef)
+	writeTestFile(t, repo, "pkg/head_only.go", "package sample\nfunc HeadOnly(value int) int { return value }\n")
+	commitTestRepository(t, repo, "head branch")
+	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	withWorkingDirectory(t, repo, func() {
+		files, err := changedFiles(baseRef, headRef)
+		if err != nil {
+			t.Fatalf("list exact-ref changes: %v", err)
+		}
+		if len(files) != 2 || !containsChangedFile(files, "A", "pkg/head_only.go") || !containsChangedFile(files, "D", "pkg/base_only.go") {
+			t.Fatalf("divergent-ref changes = %#v, want head addition and base deletion", files)
+		}
+	})
+}
+
+func containsChangedFile(files []changedFile, status, path string) bool {
+	for _, file := range files {
+		if file.status == status && file.path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func TestNestedModuleBoundaryChangesFailClosed(t *testing.T) {
+	for _, tc := range []struct {
+		name, baseModule, headModule string
+	}{
+		{name: "add boundary", headModule: "module example.com/nested\n\ngo 1.23\n"},
+		{name: "remove boundary", baseModule: "module example.com/nested\n\ngo 1.23\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := initTestRepository(t)
+			writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() {}\n")
+			if tc.baseModule != "" {
+				writeTestFile(t, repo, "pkg/go.mod", tc.baseModule)
+			}
+			commitTestRepository(t, repo, "base inventory")
+			baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+			if tc.baseModule == "" {
+				writeTestFile(t, repo, "pkg/go.mod", tc.headModule)
+			} else if err := os.Remove(filepath.Join(repo, "pkg", "go.mod")); err != nil {
+				t.Fatal(err)
+			}
+			commitTestRepository(t, repo, "head module boundary")
+			headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+			withWorkingDirectory(t, repo, func() {
+				if _, err := changedFiles(baseRef, headRef); err == nil || !strings.Contains(err.Error(), "nested module boundary changed") {
+					t.Fatalf("module boundary change error = %v", err)
+				}
+			})
+		})
+	}
+}
+
 func assertChangedFilesAcceptEmptyDiff(t *testing.T) {
 	t.Helper()
 	empty, err := parseChangedFiles(" \n")
@@ -310,22 +373,22 @@ func assertModifiedRenameDiff(t *testing.T, baseRef, headRef string) {
 
 func assertModifiedRenameInventory(t *testing.T, baseRef, headRef string) {
 	t.Helper()
-	baseFunctions, headFunctions, aliases, testOnly, _, err := collectChangedFunctions(baseRef, headRef)
+	changed, err := collectChangedFunctions(baseRef, headRef)
 	if err != nil {
 		t.Fatalf("collect renamed functions: %v", err)
 	}
-	if testOnly {
+	if changed.testOnly {
 		t.Fatal("production source rename classified as test-only")
 	}
-	if len(baseFunctions) != 2 || len(headFunctions) != 2 {
-		t.Fatalf("renamed function inventory = base %d head %d, want 2 each", len(baseFunctions), len(headFunctions))
+	if len(changed.base) != 2 || len(changed.head) != 2 {
+		t.Fatalf("renamed function inventory = base %d head %d, want 2 each", len(changed.base), len(changed.head))
 	}
 	stableID := functionID{Package: "sample", File: "pkg/new.go", Name: "Stable"}
 	oldStableID := functionID{Package: "sample", File: "pkg/old.go", Name: "Stable"}
-	if aliases[stableID] != oldStableID {
-		t.Fatalf("base report alias = %v, want old-path identity", aliases[stableID])
+	if changed.renamedBaseIDs[stableID] != oldStableID {
+		t.Fatalf("base report alias = %v, want old-path identity", changed.renamedBaseIDs[stableID])
 	}
-	for id := range baseFunctions {
+	for id := range changed.base {
 		if id.File != "pkg/new.go" {
 			t.Errorf("base identity file = %q, want renamed path pkg/new.go", id.File)
 		}
@@ -387,15 +450,15 @@ func assertDeletedTestDiff(t *testing.T, baseRef, headRef string) {
 
 func assertDeletedTestInventory(t *testing.T, baseRef, headRef string) {
 	t.Helper()
-	baseFunctions, headFunctions, _, testOnly, _, err := collectChangedFunctions(baseRef, headRef)
+	changed, err := collectChangedFunctions(baseRef, headRef)
 	if err != nil {
 		t.Fatalf("collect deleted-test functions: %v", err)
 	}
-	if !testOnly {
+	if !changed.testOnly {
 		t.Fatal("deleted test file was not classified as test-only")
 	}
-	if len(baseFunctions) != 0 || len(headFunctions) != 0 {
-		t.Fatalf("deleted test functions = base %d head %d, want none", len(baseFunctions), len(headFunctions))
+	if len(changed.base) != 0 || len(changed.head) != 0 {
+		t.Fatalf("deleted test functions = base %d head %d, want none", len(changed.base), len(changed.head))
 	}
 }
 
@@ -437,9 +500,9 @@ func TestMixedProductionAndTestChangesCheckUnaffectedCRAP(t *testing.T) {
 	commitTestRepository(t, repo, "production and test change")
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
-		_, _, _, testOnly, testsChanged, err := collectChangedFunctions(baseRef, headRef)
-		if err != nil || testOnly || !testsChanged {
-			t.Fatalf("mixed diff classification: testOnly=%t testsChanged=%t err=%v", testOnly, testsChanged, err)
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil || changed.testOnly || !changed.testsChanged {
+			t.Fatalf("mixed diff classification: testOnly=%t testsChanged=%t err=%v", changed.testOnly, changed.testsChanged, err)
 		}
 		baseReport := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
 			reportEntry("pkg/service.go", "Changed", 2), reportEntry("pkg/service.go", "Legacy", 11),
@@ -471,7 +534,7 @@ func TestDeletedBuildExcludedFileDoesNotFailClosed(t *testing.T) {
 	commitTestRepository(t, repo, "delete excluded source")
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
-		if _, _, _, _, _, err := collectChangedFunctions(baseRef, headRef); err != nil {
+		if _, err := collectChangedFunctions(baseRef, headRef); err != nil {
 			t.Fatalf("deleted build-excluded file should be ignored: %v", err)
 		}
 	})
@@ -503,7 +566,7 @@ func TestRenameFromProductionIntoExcludedPathFailsClosed(t *testing.T) {
 		if err != nil || len(files) != 1 || files[0].status != "R" {
 			t.Fatalf("source move was not detected as rename: %#v, err=%v", files, err)
 		}
-		if _, _, _, _, _, err := collectChangedFunctions(baseRef, headRef); err == nil || !strings.Contains(err.Error(), "excluded path") {
+		if _, err := collectChangedFunctions(baseRef, headRef); err == nil || !strings.Contains(err.Error(), "excluded path") {
 			t.Fatalf("rename into excluded path error = %v", err)
 		}
 	})
@@ -556,12 +619,12 @@ func assertRenameBuildScope(t *testing.T, tc struct {
 	commitTestRepository(t, repo, "renamed source")
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
-		base, head, _, _, _, err := collectChangedFunctions(baseRef, headRef)
+		changed, err := collectChangedFunctions(baseRef, headRef)
 		if (err != nil) != tc.wantError {
 			t.Fatalf("collect rename error = %v, wantError %t", err, tc.wantError)
 		}
-		if err == nil && (len(base) != tc.wantBase || len(head) != tc.wantHead) {
-			t.Fatalf("rename inventory = base %d head %d, want %d and %d", len(base), len(head), tc.wantBase, tc.wantHead)
+		if err == nil && (len(changed.base) != tc.wantBase || len(changed.head) != tc.wantHead) {
+			t.Fatalf("rename inventory = base %d head %d, want %d and %d", len(changed.base), len(changed.head), tc.wantBase, tc.wantHead)
 		}
 	})
 }
@@ -622,9 +685,9 @@ func TestGoldenFixtureIsOutsideProductionScope(t *testing.T) {
 	commitTestRepository(t, repo, "fixture only")
 	headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
-		base, head, _, testOnly, _, err := collectChangedFunctions(baseRef, headRef)
-		if err != nil || !testOnly || len(base) != 0 || len(head) != 0 {
-			t.Fatalf("fixture-only diff classification = base %v head %v testOnly %t err %v", base, head, testOnly, err)
+		changed, err := collectChangedFunctions(baseRef, headRef)
+		if err != nil || !changed.testOnly || len(changed.base) != 0 || len(changed.head) != 0 {
+			t.Fatalf("fixture-only diff classification = base %v head %v testOnly %t err %v", changed.base, changed.head, changed.testOnly, err)
 		}
 	})
 }

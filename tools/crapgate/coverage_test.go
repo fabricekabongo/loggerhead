@@ -12,7 +12,7 @@ func TestChangedFileDiscoveryReportsInvalidHistory(t *testing.T) {
 	commitTestRepository(t, repo, "base")
 	ref := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	withWorkingDirectory(t, repo, func() {
-		_, _, _, _, _, err := collectChangedFunctions("missing-base", ref)
+		_, err := collectChangedFunctions("missing-base", ref)
 		if err == nil || !strings.Contains(err.Error(), "list changed Go files") {
 			t.Fatalf("invalid history error = %v", err)
 		}

@@ -268,8 +268,12 @@ func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, 
 func evaluateUnaffectedCRAPChanges(base, head map[functionID]entry, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) ([]result, error) {
 	var results []result
 	for id, headEntry := range head {
-		baseEntry, exists := base[id]
-		if !exists || productionFunctionChanged(id, baseFunctions, headFunctions, renamedBaseIDs) {
+		baseID := id
+		if renamedID, renamed := renamedBaseIDs[id]; renamed {
+			baseID = renamedID
+		}
+		baseEntry, exists := base[baseID]
+		if !exists || productionFunctionChanged(id, baseFunctions, headFunctions) {
 			continue
 		}
 		item, changed := testOnlyCRAPResult(id, baseEntry, headEntry)
@@ -281,10 +285,7 @@ func evaluateUnaffectedCRAPChanges(base, head map[functionID]entry, baseFunction
 	return results, nil
 }
 
-func productionFunctionChanged(id functionID, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) bool {
-	if _, renamed := renamedBaseIDs[id]; renamed {
-		return true
-	}
+func productionFunctionChanged(id functionID, baseFunctions, headFunctions map[functionID]string) bool {
 	headBody, changedFile := headFunctions[id]
 	if !changedFile {
 		return false

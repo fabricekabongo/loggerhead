@@ -27,6 +27,14 @@ type changedFile struct {
 	oldPath string
 }
 
+type changedFunctionSet struct {
+	base           map[functionID]string
+	head           map[functionID]string
+	renamedBaseIDs map[functionID]functionID
+	testOnly       bool
+	testsChanged   bool
+}
+
 func main() {
 	log.SetFlags(0)
 	// Process termination cannot be reached by the in-process Go test harness.
@@ -69,18 +77,18 @@ func run(config options, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	baseFunctions, headFunctions, renamedBaseIDs, testOnly, testsChanged, err := collectChangedFunctions(config.baseRef, config.headRef)
+	changed, err := collectChangedFunctions(config.baseRef, config.headRef)
 	if err != nil {
 		return err
 	}
 	var results []result
-	if testOnly {
+	if changed.testOnly {
 		results, err = evaluateTestOnlyCRAPChanges(base, head)
 	} else {
-		results, err = evaluateWithRenamedBaseIDs(base, head, baseFunctions, headFunctions, renamedBaseIDs)
-		if err == nil && testsChanged {
+		results, err = evaluateWithRenamedBaseIDs(base, head, changed.base, changed.head, changed.renamedBaseIDs)
+		if err == nil && changed.testsChanged {
 			var testResults []result
-			testResults, err = evaluateUnaffectedCRAPChanges(base, head, baseFunctions, headFunctions, renamedBaseIDs)
+			testResults, err = evaluateUnaffectedCRAPChanges(base, head, changed.base, changed.head, changed.renamedBaseIDs)
 			results = append(results, testResults...)
 		}
 	}
@@ -152,10 +160,10 @@ func readReport(path, label string) (map[functionID]entry, error) {
 	return entries, nil
 }
 
-func collectChangedFunctions(baseRef, headRef string) (map[functionID]string, map[functionID]string, map[functionID]functionID, bool, bool, error) {
+func collectChangedFunctions(baseRef, headRef string) (changedFunctionSet, error) {
 	files, err := changedFiles(baseRef, headRef)
 	if err != nil {
-		return nil, nil, nil, false, false, err
+		return changedFunctionSet{}, err
 	}
 	baseFunctions := make(map[functionID]string)
 	headFunctions := make(map[functionID]string)
@@ -170,10 +178,10 @@ func collectChangedFunctions(baseRef, headRef string) (map[functionID]string, ma
 			testsChanged = true
 		}
 		if err := collectOneFile(file, baseRef, headRef, baseFunctions, headFunctions, renamedBaseIDs); err != nil {
-			return nil, nil, nil, false, false, err
+			return changedFunctionSet{}, err
 		}
 	}
-	return baseFunctions, headFunctions, renamedBaseIDs, testOnly, testsChanged, nil
+	return changedFunctionSet{base: baseFunctions, head: headFunctions, renamedBaseIDs: renamedBaseIDs, testOnly: testOnly, testsChanged: testsChanged}, nil
 }
 
 func isTestOnlyChange(file changedFile) bool {
@@ -209,11 +217,83 @@ func testOnlyCRAPResult(id functionID, base, head entry) (result, bool) {
 }
 
 func changedFiles(baseRef, headRef string) ([]changedFile, error) {
-	output, err := gitOutput("diff", "--find-renames", "--name-status", "--diff-filter=ACMRTD", baseRef+"..."+headRef, "--", "*.go")
+	output, err := gitOutput("diff", "--find-renames", "--name-status", "--diff-filter=ACMRTD", baseRef+".."+headRef, "--", "*.go")
 	if err != nil {
 		return nil, fmt.Errorf("list changed Go files: %w", err)
 	}
-	return parseChangedFiles(output)
+	files, err := parseChangedFiles(output)
+	if err != nil {
+		return nil, err
+	}
+	if err := rejectNestedModuleBoundaryChanges(baseRef, headRef); err != nil {
+		return nil, err
+	}
+	return files, nil
+}
+
+func rejectNestedModuleBoundaryChanges(baseRef, headRef string) error {
+	output, err := gitOutput("diff", "--find-renames", "--name-status", "--diff-filter=ACMRTD", baseRef+".."+headRef, "--", ":(glob)**/go.mod")
+	if err != nil {
+		return fmt.Errorf("list changed module files: %w", err)
+	}
+	files, err := parseChangedFiles(output)
+	if err != nil {
+		return err
+	}
+	for _, file := range files {
+		changed, err := nestedModuleBoundaryChanged(baseRef, file)
+		if err != nil {
+			return err
+		}
+		if changed {
+			return fmt.Errorf("nested module boundary changed at %s; Go source inventory cannot be assessed", moduleChangePath(file))
+		}
+	}
+	return nil
+}
+
+func nestedModuleBoundaryChanged(baseRef string, file changedFile) (bool, error) {
+	if file.status != "A" && file.status != "D" && file.status != "R" {
+		return false, nil
+	}
+	paths := []string{file.path}
+	if file.status == "R" {
+		paths = append(paths, file.oldPath)
+	}
+	for _, path := range paths {
+		if !isNestedModulePath(path) {
+			continue
+		}
+		containsGo, err := moduleContainsGoFile(baseRef, filepath.ToSlash(filepath.Dir(path)))
+		if err != nil || containsGo {
+			return containsGo, err
+		}
+	}
+	return false, nil
+}
+
+func moduleContainsGoFile(ref, directory string) (bool, error) {
+	listing, err := gitOutput("ls-tree", "-r", "--name-only", ref, "--", directory)
+	if err != nil {
+		return false, fmt.Errorf("list Go sources under nested module %s at %s: %w", directory, ref, err)
+	}
+	for _, path := range strings.Split(listing, "\n") {
+		if strings.HasSuffix(path, ".go") {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func moduleChangePath(file changedFile) string {
+	if file.status == "R" {
+		return file.oldPath + " -> " + file.path
+	}
+	return file.path
+}
+
+func isNestedModulePath(path string) bool {
+	return strings.Contains(path, "/") && !strings.HasPrefix(path, "quality/go-crap-fixtures/")
 }
 
 func collectOneFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) error {

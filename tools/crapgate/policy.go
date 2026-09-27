@@ -184,7 +184,7 @@ func normalizeReportedPath(path string) string {
 
 func parseFunctions(filename, packageName string, source []byte) (map[functionID]string, error) {
 	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, filename, source, parser.ParseComments)
+	file, err := parser.ParseFile(fset, filename, source, 0)
 	if err != nil {
 		return nil, fmt.Errorf("parse %s: %w", filename, err)
 	}
@@ -201,12 +201,16 @@ func parseFunctions(filename, packageName string, source []byte) (map[functionID
 		if fn.Recv != nil && len(fn.Recv.List) > 0 {
 			receiver, err = formatNode(fset, fn.Recv.List[0].Type)
 			if err != nil {
+				// Parser-produced receiver nodes are valid for go/format.
+				// skipcq: TCV-001
 				return nil, fmt.Errorf("format receiver in %s: %w", filename, err)
 			}
 		}
 		id := functionID{Package: packageName, File: normalizeReportedPath(filename), Receiver: receiver, Name: fn.Name.Name}
 		text, err := formatNode(fset, fn)
 		if err != nil {
+			// Parser-produced declarations are valid for go/format.
+			// skipcq: TCV-001
 			return nil, fmt.Errorf("format %s in %s: %w", fn.Name.Name, filename, err)
 		}
 		functions[id] = text
@@ -223,9 +227,13 @@ func formatNode(fset *token.FileSet, node ast.Node) (string, error) {
 }
 
 func evaluate(base, head map[functionID]entry, baseFunctions, headFunctions map[functionID]string) ([]result, error) {
+	return evaluateWithRenamedBaseIDs(base, head, baseFunctions, headFunctions, nil)
+}
+
+func evaluateWithRenamedBaseIDs(base, head map[functionID]entry, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) ([]result, error) {
 	var results []result
 	for id, body := range headFunctions {
-		headEntry, found := findEntry(head, id)
+		headEntry, found := head[id]
 		if !found {
 			return nil, fmt.Errorf("head CRAP report missing function %s", id)
 		}
@@ -239,7 +247,11 @@ func evaluate(base, head map[functionID]entry, baseFunctions, headFunctions map[
 		if body == baseBody {
 			continue
 		}
-		baseEntry, found := findEntry(base, id)
+		baseID := id
+		if renamedID, renamed := renamedBaseIDs[id]; renamed {
+			baseID = renamedID
+		}
+		baseEntry, found := findEntry(base, baseID)
 		if !found {
 			return nil, fmt.Errorf("base CRAP report missing changed function %s", id)
 		}

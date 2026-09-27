@@ -22,13 +22,16 @@ type options struct {
 }
 
 type changedFile struct {
-	status string
-	path   string
+	status  string
+	path    string
+	oldPath string
 }
 
 func main() {
 	log.SetFlags(0)
 	if err := execute(os.Args[1:]); err != nil {
+		// Process termination cannot be reached by the in-process Go test harness.
+		// skipcq: TCV-001
 		log.Fatal(err)
 	}
 }
@@ -66,7 +69,7 @@ func run(config options, output io.Writer) error {
 	if err != nil {
 		return err
 	}
-	baseFunctions, headFunctions, testOnly, err := collectChangedFunctions(config.baseRef, config.headRef)
+	baseFunctions, headFunctions, renamedBaseIDs, testOnly, err := collectChangedFunctions(config.baseRef, config.headRef)
 	if err != nil {
 		return err
 	}
@@ -74,7 +77,7 @@ func run(config options, output io.Writer) error {
 	if testOnly {
 		results, err = evaluateTestOnlyCRAPChanges(base, head)
 	} else {
-		results, err = evaluate(base, head, baseFunctions, headFunctions)
+		results, err = evaluateWithRenamedBaseIDs(base, head, baseFunctions, headFunctions, renamedBaseIDs)
 	}
 	if err != nil {
 		return err
@@ -144,23 +147,28 @@ func readReport(path, label string) (map[functionID]entry, error) {
 	return entries, nil
 }
 
-func collectChangedFunctions(baseRef, headRef string) (map[functionID]string, map[functionID]string, bool, error) {
+func collectChangedFunctions(baseRef, headRef string) (map[functionID]string, map[functionID]string, map[functionID]functionID, bool, error) {
 	files, err := changedFiles(baseRef, headRef)
 	if err != nil {
-		return nil, nil, false, err
+		return nil, nil, nil, false, err
 	}
 	baseFunctions := make(map[functionID]string)
 	headFunctions := make(map[functionID]string)
+	renamedBaseIDs := make(map[functionID]functionID)
 	testOnly := len(files) > 0
 	for _, file := range files {
-		if !strings.HasSuffix(file.path, "_test.go") && !strings.HasPrefix(file.path, "quality/go-crap-fixtures/") {
+		if !isTestOnlyChange(file) {
 			testOnly = false
 		}
-		if err := collectOneFile(file, baseRef, headRef, baseFunctions, headFunctions); err != nil {
-			return nil, nil, false, err
+		if err := collectOneFile(file, baseRef, headRef, baseFunctions, headFunctions, renamedBaseIDs); err != nil {
+			return nil, nil, nil, false, err
 		}
 	}
-	return baseFunctions, headFunctions, testOnly, nil
+	return baseFunctions, headFunctions, renamedBaseIDs, testOnly, nil
+}
+
+func isTestOnlyChange(file changedFile) bool {
+	return strings.HasSuffix(file.path, "_test.go") || strings.HasPrefix(file.path, "quality/go-crap-fixtures/")
 }
 
 func evaluateTestOnlyCRAPChanges(base, head map[functionID]entry) ([]result, error) {
@@ -192,24 +200,124 @@ func testOnlyCRAPResult(id functionID, base, head entry) (result, bool) {
 }
 
 func changedFiles(baseRef, headRef string) ([]changedFile, error) {
-	output, err := gitOutput("diff", "--no-renames", "--name-status", "--diff-filter=ACMRT", baseRef+"..."+headRef, "--", "*.go")
+	output, err := gitOutput("diff", "--find-renames", "--name-status", "--diff-filter=ACMRTD", baseRef+"..."+headRef, "--", "*.go")
 	if err != nil {
 		return nil, fmt.Errorf("list changed Go files: %w", err)
 	}
 	return parseChangedFiles(output)
 }
 
-func collectOneFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string) error {
-	// The golden fixture is a separate Go module and is not production code in ./....
-	if strings.HasSuffix(file.path, "_test.go") || strings.HasPrefix(file.path, "quality/go-crap-fixtures/") {
+func collectOneFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string, renamedBaseIDs map[functionID]functionID) error {
+	switch file.status {
+	case "R":
+		return collectRenamedFile(file, baseRef, headRef, baseFunctions, headFunctions, renamedBaseIDs)
+	case "D":
+		return collectDeletedFile(file, baseRef)
+	default:
+		return collectModifiedFile(file, baseRef, headRef, baseFunctions, headFunctions)
+	}
+}
+
+func collectRenamedFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string, aliases map[functionID]functionID) error {
+	baseIncluded, err := collectRenamedBase(file, baseRef, baseFunctions, aliases)
+	if err != nil {
+		return err
+	}
+	headIncluded, err := collectRenamedHead(file, headRef, headFunctions, baseIncluded)
+	if err != nil {
+		return err
+	}
+	if baseIncluded && !headIncluded {
+		return fmt.Errorf("production Go file rename from %s to out-of-scope path %s cannot be assessed", file.oldPath, file.path)
+	}
+	return nil
+}
+
+func collectRenamedBase(file changedFile, baseRef string, functions map[functionID]string, aliases map[functionID]functionID) (bool, error) {
+	if !isProductionGoPath(file.oldPath) {
+		return false, nil
+	}
+	return collectRenamedSource(functions, baseRef, file.oldPath, file.path, aliases)
+}
+
+func collectRenamedHead(file changedFile, headRef string, functions map[functionID]string, baseIncluded bool) (bool, error) {
+	if !isProductionGoPath(file.path) {
+		if baseIncluded {
+			return false, fmt.Errorf("production Go file rename from %s to excluded path %s cannot be assessed", file.oldPath, file.path)
+		}
+		return false, nil
+	}
+	return collectProductionFile(functions, headRef, file.path)
+}
+
+func collectDeletedFile(file changedFile, baseRef string) error {
+	if !isProductionGoPath(file.path) {
+		return nil
+	}
+	included, err := pathInScannedModule(baseRef, file.path)
+	if err != nil || !included {
+		return err
+	}
+	return fmt.Errorf("deleted production Go file %s cannot be assessed against a head CRAP report", file.path)
+}
+
+func collectModifiedFile(file changedFile, baseRef, headRef string, baseFunctions, headFunctions map[functionID]string) error {
+	if !isProductionGoPath(file.path) {
 		return nil
 	}
 	if file.status != "A" {
-		if err := addFileFunctions(baseFunctions, baseRef, file.path); err != nil {
+		if _, err := collectProductionFile(baseFunctions, baseRef, file.path); err != nil {
 			return err
 		}
 	}
-	return addFileFunctions(headFunctions, headRef, file.path)
+	_, err := collectProductionFile(headFunctions, headRef, file.path)
+	return err
+}
+
+func collectProductionFile(functions map[functionID]string, ref, path string) (bool, error) {
+	included, err := pathInScannedModule(ref, path)
+	if err != nil || !included {
+		return included, err
+	}
+	return true, addFileFunctions(functions, ref, path)
+}
+
+func collectRenamedSource(functions map[functionID]string, ref, sourcePath, identityPath string, aliases map[functionID]functionID) (bool, error) {
+	included, err := pathInScannedModule(ref, sourcePath)
+	if err != nil || !included {
+		return included, err
+	}
+	return true, addFileFunctionsAt(functions, ref, sourcePath, identityPath, aliases)
+}
+
+func isProductionGoPath(path string) bool {
+	return !strings.HasSuffix(path, "_test.go") && !pathExcludedByGoPattern(path)
+}
+
+func pathExcludedByGoPattern(path string) bool {
+	parts := strings.Split(filepath.ToSlash(path), "/")
+	for _, part := range parts[:len(parts)-1] {
+		if part == "vendor" || part == "testdata" || strings.HasPrefix(part, ".") || strings.HasPrefix(part, "_") {
+			return true
+		}
+	}
+	return false
+}
+
+func pathInScannedModule(ref, path string) (bool, error) {
+	directory := filepath.ToSlash(filepath.Dir(path))
+	for directory != "." {
+		modPath := directory + "/go.mod"
+		listing, err := gitOutput("ls-tree", "--name-only", ref, "--", modPath)
+		if err != nil {
+			return false, fmt.Errorf("check nested module %s at %s: %w", modPath, ref, err)
+		}
+		if strings.TrimSpace(listing) == modPath {
+			return false, nil
+		}
+		directory = filepath.ToSlash(filepath.Dir(directory))
+	}
+	return true, nil
 }
 
 func parseChangedFiles(output string) ([]changedFile, error) {
@@ -218,33 +326,47 @@ func parseChangedFiles(output string) ([]changedFile, error) {
 		if strings.TrimSpace(line) == "" {
 			continue
 		}
-		fields := strings.SplitN(line, "\t", 2)
-		if len(fields) != 2 || fields[1] == "" {
-			return nil, fmt.Errorf("invalid git diff name-status line %q", line)
+		fields := strings.Split(line, "\t")
+		if len(fields) == 2 && fields[1] != "" {
+			files = append(files, changedFile{status: fields[0], path: fields[1]})
+			continue
 		}
-		files = append(files, changedFile{status: fields[0], path: fields[1]})
+		if len(fields) == 3 && strings.HasPrefix(fields[0], "R") && fields[1] != "" && fields[2] != "" {
+			files = append(files, changedFile{status: "R", oldPath: fields[1], path: fields[2]})
+			continue
+		}
+		return nil, fmt.Errorf("invalid git diff name-status line %q", line)
 	}
 	return files, nil
 }
 
 func addFileFunctions(dst map[functionID]string, ref, path string) error {
-	source, err := gitOutput("show", ref+":"+path)
+	return addFileFunctionsAt(dst, ref, path, path, nil)
+}
+
+func addFileFunctionsAt(dst map[functionID]string, ref, sourcePath, identityPath string, aliases map[functionID]functionID) error {
+	source, err := gitOutput("show", ref+":"+sourcePath)
 	if err != nil {
-		return fmt.Errorf("read %s:%s: %w", ref, path, err)
+		return fmt.Errorf("read %s:%s: %w", ref, sourcePath, err)
 	}
-	inBuild, err := fileInLinuxDefaultBuild(path, []byte(source))
+	inBuild, err := fileInLinuxDefaultBuild(sourcePath, []byte(source))
 	if err != nil {
-		return fmt.Errorf("check build constraints for %s at %s: %w", path, ref, err)
+		return fmt.Errorf("check build constraints for %s at %s: %w", sourcePath, ref, err)
 	}
 	if !inBuild {
 		return nil
 	}
-	functions, err := parseFunctions(path, "", []byte(source))
+	functions, err := parseFunctions(identityPath, "", []byte(source))
 	if err != nil {
-		return fmt.Errorf("parse %s at %s: %w", path, ref, err)
+		return fmt.Errorf("parse %s at %s: %w", sourcePath, ref, err)
 	}
 	for id, declaration := range functions {
 		dst[id] = declaration
+		if sourcePath != identityPath && aliases != nil {
+			baseID := id
+			baseID.File = normalizeReportedPath(sourcePath)
+			aliases[id] = baseID
+		}
 	}
 	return nil
 }

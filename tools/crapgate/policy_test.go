@@ -240,6 +240,22 @@ func TestUnchangedFunctionIsNotGated(t *testing.T) {
 	}
 }
 
+func TestRenameAliasAppliesOnlyToBaseReportLookup(t *testing.T) {
+	id := testID("pkg/new.go", "", "Run")
+	oldID := testID("pkg/old.go", "", "Run")
+	wrongHeadID := testID("pkg/old.go", "", "Run")
+	_, err := evaluateWithRenamedBaseIDs(
+		map[functionID]entry{oldID: testEntry(oldID, "Run", 15)},
+		map[functionID]entry{wrongHeadID: testEntry(wrongHeadID, "Run", 14)},
+		map[functionID]string{id: "func Run() { return 1 }"},
+		map[functionID]string{id: "func Run() { return 2 }"},
+		map[functionID]functionID{id: oldID},
+	)
+	if err == nil || !strings.Contains(err.Error(), "head CRAP report missing function") {
+		t.Fatalf("renamed head report lookup error = %v", err)
+	}
+}
+
 func TestReportIdentityIncludesPathAndReceiver(t *testing.T) {
 	data, err := json.Marshal(testReport(
 		entry{File: "../pkg/a.go", Package: "fixture", Function: "*Counter.Run", Receiver: "*Counter", CRAP: floatPtr(2), Cyclomatic: intPtr(1), Coverage: floatPtr(0), Line: intPtr(1)},
@@ -287,5 +303,33 @@ func TestParseFunctionsUsesFullDeclarationAndReceiver(t *testing.T) {
 	body, ok := functions[id]
 	if !ok || !strings.Contains(body, "Run(x int)") {
 		t.Fatalf("function identity/source = %v, %q", ok, body)
+	}
+}
+
+func TestParseFunctionsIgnoresDocumentationButTracksBodyChanges(t *testing.T) {
+	const original = "package fixture\nfunc Run(value int) int { return value + 1 }\n"
+	const documented = "package fixture\n// Run explains the value transformation.\nfunc Run(value int) int { return value + 1 }\n"
+	const changedBody = "package fixture\n// Run explains the value transformation.\nfunc Run(value int) int { return value + 2 }\n"
+
+	parse := func(source string) string {
+		t.Helper()
+		functions, err := parseFunctions("pkg/file.go", "fixture", []byte(source))
+		if err != nil {
+			t.Fatalf("parse function source: %v", err)
+		}
+		id := testID("pkg/file.go", "", "Run")
+		declaration, ok := functions[id]
+		if !ok {
+			t.Fatalf("function fingerprint missing for %s", id)
+		}
+		return declaration
+	}
+
+	originalFingerprint := parse(original)
+	if documentedFingerprint := parse(documented); documentedFingerprint != originalFingerprint {
+		t.Fatalf("doc-only edit changed function fingerprint:\noriginal: %s\ndocumented: %s", originalFingerprint, documentedFingerprint)
+	}
+	if bodyChangedFingerprint := parse(changedBody); bodyChangedFingerprint == originalFingerprint {
+		t.Fatalf("executable body edit did not change function fingerprint: %s", originalFingerprint)
 	}
 }

@@ -30,6 +30,9 @@ jobs:
     - name: Race-check World tests
       run: go test -race ./world
 
+    - name: Race-check parallel Save benchmark (instrumented correctness run)
+      run: go test -race ./world -run '^$' -bench '^BenchmarkWorldSave/NewInsert/Parallel$' -benchtime=1000x -cpu=2
+
     - name: Run legacy World benchmarks with 1,2,4 CPUs
       run: go test ./world -run '^$' -bench '^BenchmarkWorld(Parallel)?$' -benchmem -benchtime=2s -cpu=1,2,4
 

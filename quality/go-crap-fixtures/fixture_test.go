@@ -2,11 +2,11 @@ package crapfixture
 
 import "testing"
 
-func TestScorePartial(t *testing.T) {
+func TestScorePartial(_ *testing.T) {
 	Score(true, true, false, false)
 }
 
-func TestScoreFull(t *testing.T) {
+func TestScoreFull(_ *testing.T) {
 	Score(true, true, true, true)
 }
 

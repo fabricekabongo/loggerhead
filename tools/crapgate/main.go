@@ -38,7 +38,7 @@ func execute(args []string) error {
 	if err != nil {
 		return err
 	}
-	return run(config)
+	return run(config, os.Stdout)
 }
 
 func parseOptions(args []string) (options, error) {
@@ -58,7 +58,7 @@ func parseOptions(args []string) (options, error) {
 	return config, nil
 }
 
-func run(config options) error {
+func run(config options, output io.Writer) error {
 	if err := validateRefs(config.baseRef, config.headRef); err != nil {
 		return err
 	}
@@ -79,10 +79,10 @@ func run(config options) error {
 	if err != nil {
 		return err
 	}
-	if err := writeWorst(os.Stdout, head, 10); err != nil {
+	if err := writeWorst(output, head, 10); err != nil {
 		return err
 	}
-	return writeResults(os.Stdout, results)
+	return writeResults(output, results)
 }
 
 func writeWorst(output io.Writer, entries map[functionID]entry, limit int) error {

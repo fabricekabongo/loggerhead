@@ -4,6 +4,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -20,6 +21,9 @@ func TestParseOptionsHandlesValidMissingAndInvalidFlags(t *testing.T) {
 	if _, err := parseOptions(nil); err == nil {
 		t.Fatal("missing flags accepted")
 	}
+	if err := execute(nil); err == nil {
+		t.Fatal("CLI accepted missing flags")
+	}
 	if _, err := parseOptions(append(args, "--unknown")); err == nil {
 		t.Fatal("unknown flag accepted")
 	}
@@ -29,6 +33,40 @@ func TestParseOptionsHandlesValidMissingAndInvalidFlags(t *testing.T) {
 	if _, err := parseOptions([]string{"--base-report", "base.json", "--head-report", "head.json", "--base-ref", "main", "--head-ref"}); err == nil {
 		t.Fatal("final flag missing its value accepted")
 	}
+}
+
+func TestCLIEntrypointReportsExactRevision(t *testing.T) {
+	repo := initTestRepository(t)
+	writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() {}\n")
+	commitTestRepository(t, repo, "source")
+	ref := gitTestOutput(t, repo, "rev-parse", "HEAD")
+	reportPath := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 1)}})
+	withWorkingDirectory(t, repo, func() {
+		reader, writer, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := reader.Close(); err != nil {
+				t.Error(err)
+			}
+		}()
+		previousArgs, previousOutput, previousLogFlags := os.Args, os.Stdout, log.Flags()
+		defer func() {
+			os.Args, os.Stdout = previousArgs, previousOutput
+			log.SetFlags(previousLogFlags)
+		}()
+		os.Args = []string{"crapgate", "--base-report", reportPath, "--head-report", reportPath, "--base-ref", ref, "--head-ref", ref}
+		os.Stdout = writer
+		main()
+		if err := writer.Close(); err != nil {
+			t.Fatal(err)
+		}
+		output, err := io.ReadAll(reader)
+		if err != nil || !strings.Contains(string(output), "worst sample/pkg/service.go:Stable") {
+			t.Fatalf("CLI output = %q, err=%v", output, err)
+		}
+	})
 }
 
 func TestRunComparesChangesInTemporaryGitRepository(t *testing.T) {
@@ -62,26 +100,58 @@ func TestRunRejectsRefsReportsAndPolicyViolations(t *testing.T) {
 	ref := gitTestOutput(t, repo, "rev-parse", "HEAD")
 	reportPath := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 1)}})
 	withWorkingDirectory(t, repo, func() {
-		if err := run(options{baseReport: reportPath, headReport: reportPath, baseRef: "bad-ref", headRef: ref}); err == nil {
+		if err := run(options{baseReport: reportPath, headReport: reportPath, baseRef: "bad-ref", headRef: ref}, io.Discard); err == nil {
 			t.Fatal("invalid base ref accepted")
 		}
-		if err := run(options{baseReport: reportPath, headReport: reportPath, baseRef: ref, headRef: "bad-ref"}); err == nil {
+		if err := run(options{baseReport: reportPath, headReport: reportPath, baseRef: ref, headRef: "bad-ref"}, io.Discard); err == nil {
 			t.Fatal("invalid head ref accepted")
 		}
-		if err := run(options{baseReport: filepath.Join(repo, "missing.json"), headReport: reportPath, baseRef: ref, headRef: ref}); err == nil {
+		if err := run(options{baseReport: filepath.Join(repo, "missing.json"), headReport: reportPath, baseRef: ref, headRef: ref}, io.Discard); err == nil {
 			t.Fatal("missing base report accepted")
 		}
-		if err := run(options{baseReport: reportPath, headReport: filepath.Join(repo, "missing.json"), baseRef: ref, headRef: ref}); err == nil {
+		if err := run(options{baseReport: reportPath, headReport: filepath.Join(repo, "missing.json"), baseRef: ref, headRef: ref}, io.Discard); err == nil {
 			t.Fatal("missing head report accepted")
 		}
 		badReport := writeTestReport(t, report{Version: "wrong", Entries: []entry{reportEntry("pkg/service.go", "Stable", 1)}})
-		if err := run(options{baseReport: badReport, headReport: reportPath, baseRef: ref, headRef: ref}); err == nil {
+		if err := run(options{baseReport: badReport, headReport: reportPath, baseRef: ref, headRef: ref}, io.Discard); err == nil {
 			t.Fatal("invalid report accepted")
 		}
 	})
 	if err := writeResults(io.Discard, []result{{Kind: "new", ID: testID("pkg/new.go", "", "Added"), Head: 11, Allowed: false}}); err == nil {
 		t.Fatal("policy violation passed")
 	}
+}
+
+func TestRunReturnsWriterAndChangedSourceErrors(t *testing.T) {
+	t.Run("writer failure", func(t *testing.T) {
+		repo := initTestRepository(t)
+		writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() {}\n")
+		commitTestRepository(t, repo, "source")
+		ref := gitTestOutput(t, repo, "rev-parse", "HEAD")
+		reportPath := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 1)}})
+		withWorkingDirectory(t, repo, func() {
+			err := run(options{baseReport: reportPath, headReport: reportPath, baseRef: ref, headRef: ref}, failingWriter{})
+			if err == nil || !strings.Contains(err.Error(), "write worst CRAP function") {
+				t.Fatalf("run writer error = %v", err)
+			}
+		})
+	})
+	t.Run("malformed changed source", func(t *testing.T) {
+		repo := initTestRepository(t)
+		writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable() {}\n")
+		commitTestRepository(t, repo, "base source")
+		baseRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+		writeTestFile(t, repo, "pkg/service.go", "package sample\nfunc Stable( {\n")
+		commitTestRepository(t, repo, "malformed source")
+		headRef := gitTestOutput(t, repo, "rev-parse", "HEAD")
+		reportPath := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{reportEntry("pkg/service.go", "Stable", 1)}})
+		withWorkingDirectory(t, repo, func() {
+			err := run(options{baseReport: reportPath, headReport: reportPath, baseRef: baseRef, headRef: headRef}, io.Discard)
+			if err == nil || !strings.Contains(err.Error(), "parse") {
+				t.Fatalf("run malformed source error = %v", err)
+			}
+		})
+	})
 }
 
 func TestRunAssessesCRAPChangesForTestOnlyDiff(t *testing.T) {
@@ -104,25 +174,25 @@ func TestRunAssessesCRAPChangesForTestOnlyDiff(t *testing.T) {
 		if err != nil || len(files) != 1 || !strings.HasSuffix(files[0].path, "_test.go") {
 			t.Fatalf("test-only file diff = %#v, err=%v", files, err)
 		}
-		if err := run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}); err != nil {
+		if err := run(options{baseReport: baseReport, headReport: headReport, baseRef: baseRef, headRef: headRef}, io.Discard); err != nil {
 			t.Fatalf("test-only CRAP comparison: %v", err)
 		}
 		worseLegacy := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
 			reportEntry("pkg/service.go", "Stable", 9), reportEntry("pkg/service.go", "Legacy", 15.01),
 		}})
-		if err := run(options{baseReport: baseReport, headReport: worseLegacy, baseRef: baseRef, headRef: headRef}); err == nil {
+		if err := run(options{baseReport: baseReport, headReport: worseLegacy, baseRef: baseRef, headRef: headRef}, io.Discard); err == nil {
 			t.Fatal("worsened legacy CRAP accepted for test-only diff")
 		}
 		aboveLimit := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
 			reportEntry("pkg/service.go", "Stable", 10.01), reportEntry("pkg/service.go", "Legacy", 15),
 		}})
-		if err := run(options{baseReport: baseReport, headReport: aboveLimit, baseRef: baseRef, headRef: headRef}); err == nil {
+		if err := run(options{baseReport: baseReport, headReport: aboveLimit, baseRef: baseRef, headRef: headRef}, io.Discard); err == nil {
 			t.Fatal("test-only CRAP above 10 accepted")
 		}
 		partial := writeTestReport(t, report{Version: reportSchemaVersion, Entries: []entry{
 			reportEntry("pkg/service.go", "Stable", 9),
 		}})
-		if err := run(options{baseReport: baseReport, headReport: partial, baseRef: baseRef, headRef: headRef}); err == nil {
+		if err := run(options{baseReport: baseReport, headReport: partial, baseRef: baseRef, headRef: headRef}, io.Discard); err == nil {
 			t.Fatal("partial test-only function inventory accepted")
 		}
 	})
@@ -168,6 +238,9 @@ func TestSourceReadAndParseFailuresInGitHistory(t *testing.T) {
 		}
 		if _, err := gitOutput("show", "HEAD:missing.go"); err == nil {
 			t.Fatal("missing source accepted")
+		}
+		if err := addFileFunctions(map[functionID]string{}, "HEAD", "missing.go"); err == nil {
+			t.Fatal("missing source accepted by function collector")
 		}
 	})
 	baseRepo := initTestRepository(t)

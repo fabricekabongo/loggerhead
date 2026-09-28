@@ -49,7 +49,7 @@ func main() {
 	ClusterCtx, concel := context.WithCancel(ctx)
 	clusterEngine := clustering.NewEngineDecorator(ClusterCtx, cluster, writeEngine)
 
-	opsServer := admin.NewOpsServer(cluster, cfg)
+	opsServer := admin.NewOpsServer(admin.NewClusterAdapter(cluster), cfg)
 	go opsServer.Start()
 
 	writer := server.NewListener(cfg.WritePort, cfg.MaxConnections, cfg.MaxEOFWait, clusterEngine) // This is the writer listener (for writes and broadcasts)

@@ -9,12 +9,14 @@ allow:
 excludeFiles:
   - '^.*_test\.go$'
   - '^.*[\\/]vendor[\\/].*\.go$'
+  - '^.*[\\/]quality[\\/]go-crap-fixtures[\\/].*\.go$'
 
 components:
   main: { in: . }
   admin: { in: admin }
   clustering: { in: clustering }
   config: { in: config }
+  crapgate: { in: tools/crapgate }
   query: { in: query }
   server: { in: server }
   world: { in: world }
